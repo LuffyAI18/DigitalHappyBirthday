@@ -1,0 +1,50 @@
+name: CI — Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18, 20]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linter
+        run: npm run lint
+
+      - name: Run tests
+        run: npx vitest run
+        env:
+          PAYPAL_CLIENT_ID: test-client-id
+          PAYPAL_CLIENT_SECRET: test-client-secret
+          PAYPAL_WEBHOOK_ID: test-webhook-id
+          ADMIN_TOKEN: test-admin-token
+          DATABASE_URL: ./data/test.db
+          NEXT_PUBLIC_PAYPAL_CLIENT_ID: test-client-id
+          NEXT_PUBLIC_BASE_URL: http://localhost:3000
+
+      - name: Build
+        run: npm run build
+        env:
+          PAYPAL_CLIENT_ID: test-client-id
+          PAYPAL_CLIENT_SECRET: test-client-secret
+          NEXT_PUBLIC_PAYPAL_CLIENT_ID: test-client-id
+          NEXT_PUBLIC_BASE_URL: http://localhost:3000

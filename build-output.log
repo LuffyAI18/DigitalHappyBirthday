@@ -1,0 +1,78 @@
+﻿Γû▓ Next.js 16.1.6 (Turbopack)
+
+node.exe : ΓÜá The 
+"middleware" file 
+convention is 
+deprecated. Please 
+use "proxy" instead. 
+Learn more: https://n
+extjs.org/docs/messag
+es/middleware-to-prox
+y
+At C:\Program Files\n
+odejs\npx.ps1:29 
+char:3
++   & $NODE_EXE 
+$NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (ΓÜá The   
+  "middle...lewar    
+e-to-proxy:Strin    
+g) [], RemoteExc    
+eption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+  Creating an optimized production build ...
+Γ£ô Compiled successfully in 5.0s
+  Running TypeScript ...
+Failed to compile.
+
+./app/create/page.tsx
+:556:33
+Type error: Type 
+'CardFormData' is 
+not assignable to 
+type 'Record<string, 
+unknown>'.
+  Index signature 
+for type 'string' is 
+missing in type 
+'CardFormData'.
+
+[0m [90m 554 |[39m
+ [90m 555 |[39m    
+                     
+    [33m<[39m[33mP
+ayPalButton[39m
+[31m[1m>[22m[39m
+[90m 556 |[39m      
+                     
+      cardPayload[33
+m=[39m{formData}
+ [90m     |[39m    
+                     
+        
+[31m[1m^[22m[39m
+ [90m 557 |[39m    
+                     
+        onSuccess[33
+m=[39m{handlePayment
+Success}
+ [90m 558 |[39m    
+                     
+        onError[33m=
+[39m{handlePaymentEr
+ror}
+ [90m 559 |[39m    
+                     
+        disabled[33m
+=[39m{[33m![39misF
+ormValid}[0m
+Next.js build worker 
+exited with code: 1 
+and signal: null
