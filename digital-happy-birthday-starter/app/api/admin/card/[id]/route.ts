@@ -31,7 +31,7 @@ export async function GET(
         return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
     }
 
-    const card = getCardById(cardId);
+    const card = await getCardById(cardId);
     if (!card) {
         return NextResponse.json({ error: 'Card not found' }, { status: 404 });
     }
@@ -61,13 +61,13 @@ export async function DELETE(
 
     if (hard) {
         // GDPR: permanently delete all card data including payments and replies
-        hardDeleteCard(cardId);
+        await hardDeleteCard(cardId);
         return NextResponse.json({
             message: 'Card permanently deleted (GDPR)',
         });
     } else {
         // Soft delete — mark as deleted but retain for audit
-        deleteCard(cardId);
+        await deleteCard(cardId);
         return NextResponse.json({
             message: 'Card soft-deleted',
         });
@@ -92,7 +92,7 @@ export async function PATCH(
     const body = await request.json();
 
     if (body.action === 'flag') {
-        flagCard(cardId);
+        await flagCard(cardId);
         return NextResponse.json({ message: 'Card flagged' });
     }
 

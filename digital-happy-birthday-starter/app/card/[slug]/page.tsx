@@ -14,7 +14,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug } = await params;
-    const card = getCardBySlug(slug);
+    const card = await getCardBySlug(slug);
 
     if (!card) {
         return { title: 'Card Not Found' };
@@ -50,7 +50,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function CardPage({ params }: Props) {
     const { slug } = await params;
-    const card = getCardBySlug(slug);
+    const card = await getCardBySlug(slug);
 
     if (!card) {
         notFound();
@@ -58,7 +58,7 @@ export default async function CardPage({ params }: Props) {
 
     const cardData = JSON.parse(card.card_json);
     const template = getTemplateById(card.template_id);
-    const replies = getRepliesByCardId(card.id);
+    const replies = await getRepliesByCardId(card.id);
 
     return (
         <CardPageClient

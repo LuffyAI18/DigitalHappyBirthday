@@ -18,7 +18,7 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const { slug } = await params;
-    const card = getCardBySlug(slug);
+    const card = await getCardBySlug(slug);
 
     if (!card) {
         return { title: 'Card Not Found' };
@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function DonatePage({ params }: Props) {
     const { slug } = await params;
-    const card = getCardBySlug(slug);
+    const card = await getCardBySlug(slug);
 
     if (!card) {
         notFound();

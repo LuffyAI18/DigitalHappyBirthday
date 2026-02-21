@@ -21,7 +21,7 @@ export async function GET(
             );
         }
 
-        const card = getCardBySlug(slug);
+        const card = await getCardBySlug(slug);
 
         if (!card) {
             return NextResponse.json(
@@ -30,7 +30,7 @@ export async function GET(
             );
         }
 
-        const replies = getRepliesByCardId(card.id);
+        const replies = await getRepliesByCardId(card.id);
 
         return NextResponse.json({
             slug: card.slug,
