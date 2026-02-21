@@ -29,15 +29,15 @@ export function middleware(request: NextRequest) {
     // Content Security Policy
     const csp = [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.paypal.com https://www.sandbox.paypal.com https://www.paypalobjects.com",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdnjs.buymeacoffee.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "img-src 'self' data: blob: https:",
         "font-src 'self' https://fonts.gstatic.com",
-        "connect-src 'self' https://www.paypal.com https://www.sandbox.paypal.com https://api-m.sandbox.paypal.com https://api-m.paypal.com",
-        "frame-src 'self' https://www.paypal.com https://www.sandbox.paypal.com",
+        "connect-src 'self' https://www.buymeacoffee.com",
+        "frame-src 'self' https://www.buymeacoffee.com",
         "object-src 'none'",
         "base-uri 'self'",
-        "form-action 'self'",
+        "form-action 'self' https://www.buymeacoffee.com",
     ].join('; ');
 
     response.headers.set('Content-Security-Policy', csp);

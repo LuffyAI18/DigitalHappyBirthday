@@ -17,7 +17,7 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: 'Digital Happy Birthday Cards — Send a Personalized Animated Card',
   description:
-    'Create and send beautiful animated birthday cards with custom messages, cake designs, and confetti for just ₹19. Share via WhatsApp, Telegram, or link.',
+    'Create and send beautiful animated birthday cards with custom messages, cake designs, and confetti — completely free. Share via WhatsApp, Telegram, or link.',
   keywords: [
     'birthday card',
     'digital birthday card',
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Digital Happy Birthday Cards',
     description:
-      'Create beautiful personalized animated birthday cards for just ₹19.',
+      'Create beautiful personalized animated birthday cards — free.',
     type: 'website',
     locale: 'en_IN',
     siteName: 'Happy Birthday Cards',
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Digital Happy Birthday Cards',
     description:
-      'Create beautiful personalized animated birthday cards for just ₹19.',
+      'Create beautiful personalized animated birthday cards — free.',
   },
 };
 

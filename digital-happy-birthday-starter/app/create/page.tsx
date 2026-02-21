@@ -6,10 +6,13 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import templates from '@/designs/templates';
 import CakePreview from '@/components/CakePreview';
-import PayPalButton from '@/components/PayPalButton';
 
 // ---------------------------------------------------------------------------
 // Card Editor Page — /create
+// ---------------------------------------------------------------------------
+// Free card creation — no payment required.
+// On completion, saves card via POST /api/cards and redirects to the
+// donate page at /card/[slug]/donate.
 // ---------------------------------------------------------------------------
 
 type CakeShape = 'round' | 'heart' | 'sheet';
@@ -48,8 +51,9 @@ const EMOJI_LIST = ['🎂', '🎉', '🎈', '🎊', '🥳', '🌟', '💖', '�
 
 export default function CreatePage() {
     const router = useRouter();
-    const [step, setStep] = useState<'edit' | 'pay' | 'success'>('edit');
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string | null>(null);
 
     const [formData, setFormData] = useState<CardFormData>({
         to: 'Dear ',
@@ -69,8 +73,6 @@ export default function CreatePage() {
         colorPalette: null,
         fontChoice: null,
     });
-
-    const [paymentError, setPaymentError] = useState<string | null>(null);
 
     const selectedTemplate = templates.find((t) => t.id === formData.templateId) || templates[0];
 
@@ -102,18 +104,38 @@ export default function CreatePage() {
         setShowEmojiPicker(false);
     };
 
-    const handlePaymentSuccess = (slug: string) => {
-        router.push(`/share/${slug}`);
-    };
-
-    const handlePaymentError = (error: string) => {
-        setPaymentError(error);
-    };
-
     const isFormValid =
         formData.to.trim().length > 0 &&
         formData.message.trim().length > 0 &&
         formData.from.trim().length > 0;
+
+    const handleComplete = async () => {
+        if (!isFormValid || saving) return;
+
+        setSaving(true);
+        setSaveError(null);
+
+        try {
+            const res = await fetch('/api/cards', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData),
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'Failed to save card');
+            }
+
+            const { slug } = await res.json();
+            router.push(`/card/${slug}/donate`);
+        } catch (err) {
+            setSaveError(
+                err instanceof Error ? err.message : 'Something went wrong. Please try again.'
+            );
+            setSaving(false);
+        }
+    };
 
     return (
         <div className="min-h-screen">
@@ -123,7 +145,7 @@ export default function CreatePage() {
                     <Link href="/" className="text-xl font-bold gradient-text font-serif">
                         🎂 HappyBirthday
                     </Link>
-                    <span className="text-sm text-gray-500">Step {step === 'edit' ? '1' : '2'} of 2</span>
+                    <span className="text-sm text-gray-500">Create Your Card</span>
                 </div>
             </nav>
 
@@ -245,8 +267,8 @@ export default function CreatePage() {
                                         key={t.id}
                                         onClick={() => updateField('templateId', t.id)}
                                         className={`p-4 rounded-xl border-2 transition-all text-left ${formData.templateId === t.id
-                                                ? 'border-pastel-400 shadow-lg scale-[1.02]'
-                                                : 'border-transparent hover:border-gray-200'
+                                            ? 'border-pastel-400 shadow-lg scale-[1.02]'
+                                            : 'border-transparent hover:border-gray-200'
                                             }`}
                                         style={{ background: t.tailwindColors.bg }}
                                         whileHover={{ scale: 1.02 }}
@@ -283,9 +305,9 @@ export default function CreatePage() {
                                         updateField('fontChoice', selectedTemplate.fontPrimary)
                                     }
                                     className={`flex-1 px-4 py-3 rounded-xl border-2 text-center transition-all ${formData.fontChoice === selectedTemplate.fontPrimary ||
-                                            (!formData.fontChoice)
-                                            ? 'border-pastel-400 bg-pastel-50'
-                                            : 'border-gray-200 hover:border-gray-300'
+                                        (!formData.fontChoice)
+                                        ? 'border-pastel-400 bg-pastel-50'
+                                        : 'border-gray-200 hover:border-gray-300'
                                         }`}
                                 >
                                     <span className="text-sm font-medium">{selectedTemplate.fontPrimary}</span>
@@ -295,8 +317,8 @@ export default function CreatePage() {
                                         updateField('fontChoice', selectedTemplate.fontAccent)
                                     }
                                     className={`flex-1 px-4 py-3 rounded-xl border-2 text-center transition-all ${formData.fontChoice === selectedTemplate.fontAccent
-                                            ? 'border-pastel-400 bg-pastel-50'
-                                            : 'border-gray-200 hover:border-gray-300'
+                                        ? 'border-pastel-400 bg-pastel-50'
+                                        : 'border-gray-200 hover:border-gray-300'
                                         }`}
                                 >
                                     <span className="text-sm font-medium">{selectedTemplate.fontAccent}</span>
@@ -319,8 +341,8 @@ export default function CreatePage() {
                                             key={shape}
                                             onClick={() => updateCakeOption('shape', shape)}
                                             className={`px-4 py-2 rounded-lg text-sm capitalize transition-all ${formData.cakeOptions.shape === shape
-                                                    ? 'bg-pastel-400 text-white'
-                                                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                                ? 'bg-pastel-400 text-white'
+                                                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                                                 }`}
                                         >
                                             {shape === 'round' && '⭕'}
@@ -340,8 +362,8 @@ export default function CreatePage() {
                                             key={color.value}
                                             onClick={() => updateCakeOption('icingColor', color.value)}
                                             className={`w-8 h-8 rounded-full border-2 transition-all ${formData.cakeOptions.icingColor === color.value
-                                                    ? 'border-gray-800 scale-110'
-                                                    : 'border-gray-200 hover:border-gray-400'
+                                                ? 'border-gray-800 scale-110'
+                                                : 'border-gray-200 hover:border-gray-400'
                                                 }`}
                                             style={{ background: color.value }}
                                             title={color.name}
@@ -428,12 +450,11 @@ export default function CreatePage() {
                         {/* Privacy note */}
                         <div className="text-xs text-gray-400 px-2">
                             🔒 We store only the info needed to create your card. You can
-                            request deletion at any time. No refunds once the card is
-                            published (₹19 is final).
+                            request deletion at any time. Card creation is free.
                         </div>
                     </div>
 
-                    {/* ============ RIGHT: Live Preview + Payment ============ */}
+                    {/* ============ RIGHT: Live Preview + Complete Button ============ */}
                     <div className="lg:sticky lg:top-20 lg:self-start space-y-6">
                         {/* Live Preview */}
                         <motion.div
@@ -517,7 +538,7 @@ export default function CreatePage() {
                             </div>
                         </motion.div>
 
-                        {/* Payment Section */}
+                        {/* Complete & Save Section */}
                         <motion.div
                             className="glass rounded-2xl p-6 space-y-4"
                             initial={{ opacity: 0, y: 20 }}
@@ -531,14 +552,14 @@ export default function CreatePage() {
                                         Your card will get a unique shareable link
                                     </p>
                                 </div>
-                                <div className="text-2xl font-bold text-pastel-400">₹19</div>
+                                <div className="text-lg font-bold text-green-500">Free ✨</div>
                             </div>
 
-                            {paymentError && (
+                            {saveError && (
                                 <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                                    {paymentError}
+                                    {saveError}
                                     <button
-                                        onClick={() => setPaymentError(null)}
+                                        onClick={() => setSaveError(null)}
                                         className="ml-2 underline"
                                     >
                                         Dismiss
@@ -552,15 +573,41 @@ export default function CreatePage() {
                                 </div>
                             )}
 
-                            <PayPalButton
-                                cardPayload={formData}
-                                onSuccess={handlePaymentSuccess}
-                                onError={handlePaymentError}
-                                disabled={!isFormValid}
-                            />
+                            <motion.button
+                                onClick={handleComplete}
+                                disabled={!isFormValid || saving}
+                                className="w-full py-4 rounded-xl text-lg font-semibold text-white shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{ background: isFormValid ? '#E85D9C' : '#ccc' }}
+                                whileHover={isFormValid ? { scale: 1.02 } : {}}
+                                whileTap={isFormValid ? { scale: 0.98 } : {}}
+                            >
+                                {saving ? (
+                                    <span className="flex items-center justify-center gap-2">
+                                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                                            <circle
+                                                className="opacity-25"
+                                                cx="12"
+                                                cy="12"
+                                                r="10"
+                                                stroke="currentColor"
+                                                strokeWidth="4"
+                                                fill="none"
+                                            />
+                                            <path
+                                                className="opacity-75"
+                                                fill="currentColor"
+                                                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                                            />
+                                        </svg>
+                                        Saving...
+                                    </span>
+                                ) : (
+                                    '🎂 Complete & Save Card'
+                                )}
+                            </motion.button>
 
                             <p className="text-xs text-center text-gray-400">
-                                Secure payment via PayPal • No account needed
+                                No payment required • Your card is saved instantly
                             </p>
                         </motion.div>
                     </div>
