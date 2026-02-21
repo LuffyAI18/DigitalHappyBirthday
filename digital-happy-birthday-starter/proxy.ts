@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // ---------------------------------------------------------------------------
-// Security Middleware
+// Security Proxy (formerly middleware — renamed for Next.js 16+)
 // ---------------------------------------------------------------------------
 // Applies CSP and security headers to all responses.
 // Protects /admin routes with ADMIN_TOKEN.
 // ---------------------------------------------------------------------------
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
     try {
         const { pathname } = request.nextUrl;
         const response = NextResponse.next();
@@ -67,8 +67,8 @@ export function middleware(request: NextRequest) {
 
         return response;
     } catch (err) {
-        // Don't let middleware errors crash the entire request
-        console.error('[Middleware Error]', err);
+        // Don't let proxy errors crash the entire request
+        console.error('[Proxy Error]', err);
         return NextResponse.next();
     }
 }
