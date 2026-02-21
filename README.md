@@ -1,8 +1,8 @@
 # 🎂 Digital Happy Birthday Starter
 
-A production-ready, open-source starter for a paid "Digital Happy Birthday / Cake Card" web product. Create beautiful animated birthday cards, accept payments via PayPal (₹19 INR), and share unique card pages.
+A production-ready, open-source starter for a **free** "Digital Happy Birthday / Cake Card" web product. Create beautiful animated birthday cards, share unique card pages, and optionally accept donations via Buy Me a Coffee.
 
-**License:** MIT | **Price:** ₹19 INR per card | **Framework:** Next.js + TypeScript
+**License:** MIT | **Price:** Free | **Framework:** Next.js 16 + TypeScript
 
 ---
 
@@ -10,11 +10,13 @@ A production-ready, open-source starter for a paid "Digital Happy Birthday / Cak
 
 - **Card Editor** — Rich message editor with emoji support, 4 template designs, customizable cakes
 - **Live Preview** — Real-time card preview with Framer Motion animations
-- **PayPal Checkout** — ₹19 INR payment via PayPal Sandbox/Live
+- **Free Card Creation** — No payment required to create and share cards
+- **Donate Page** — Optional "Support the developer" page after card creation (Buy Me a Coffee)
+- **Region-Based Pricing** — Detects visitor's locale for INR/USD/EUR donation amounts
 - **Unique Share Pages** — Each card gets a unique URL (`/card/[slug]`)
 - **Social Sharing** — WhatsApp, Telegram, X/Twitter, copy link, embed code
 - **Interactive Card Experience** — Animated cake with candles, confetti burst, recipient replies
-- **Admin Dashboard** — View/flag/delete cards, payment audit log, GDPR compliance
+- **Admin Dashboard** — View/flag/delete cards, donation click analytics, GDPR compliance
 - **Security** — CSP headers, HTML sanitization, profanity filter, rate limiting
 - **SQLite DB** — Zero-setup local database (with Supabase migration path)
 
@@ -25,7 +27,6 @@ A production-ready, open-source starter for a paid "Digital Happy Birthday / Cak
 ### Prerequisites
 
 - **Node.js 18+** and npm
-- **PayPal Developer Account** (free) for sandbox testing
 
 ### 1. Clone & Install
 
@@ -41,7 +42,14 @@ npm install
 cp .env.example .env
 ```
 
-Edit `.env` with your PayPal sandbox credentials (see next section).
+Edit `.env` with your settings:
+
+| Variable | Required | Description |
+|---|---|---|
+| `ADMIN_TOKEN` | **Yes** | Secret token for admin dashboard |
+| `DATABASE_URL` | **Yes** | SQLite file path (default: `./data/birthday-cards.db`) |
+| `BMAC_USERNAME` | Recommended | Your Buy Me a Coffee username |
+| `NEXT_PUBLIC_BASE_URL` | Optional | Base URL for meta tags (default: `http://localhost:3000`) |
 
 ### 3. Run Development Server
 
@@ -53,70 +61,46 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ---
 
-## 💳 PayPal Sandbox Setup
+## 🎯 User Flow
 
-### Step 1: Create a PayPal Developer Account
-
-1. Go to [PayPal Developer Dashboard](https://developer.paypal.com/dashboard/)
-2. Sign in or create a free account
-3. Navigate to **Apps & Credentials** → **Sandbox**
-
-### Step 2: Create a Sandbox App
-
-1. Click **Create App**
-2. Name it "Birthday Cards Test"
-3. Select **Merchant** account type
-4. Copy the **Client ID** and **Secret**
-
-### Step 3: Configure Environment Variables
-
-```env
-PAYPAL_CLIENT_ID=your_sandbox_client_id
-PAYPAL_CLIENT_SECRET=your_sandbox_secret
-NEXT_PUBLIC_PAYPAL_CLIENT_ID=your_sandbox_client_id
 ```
-
-### Step 4: Setup Webhooks (optional but recommended)
-
-1. In PayPal Dashboard → **Webhooks** → **Add Webhook**
-2. Set the URL to your ngrok tunnel (see below) + `/api/paypal-webhook`
-3. Subscribe to events:
-   - `CHECKOUT.ORDER.APPROVED`
-   - `PAYMENT.CAPTURE.COMPLETED`
-4. Copy the **Webhook ID** to `.env`:
-
-```env
-PAYPAL_WEBHOOK_ID=your_webhook_id
+1. User visits /create
+2. Fills in card details (to, message, from, template, cake options)
+3. Clicks "Complete & Save Card"
+4. POST /api/cards → sanitize, check profanity, generate slug, save to DB
+5. Redirect to /card/[slug]/donate
+6. User sees donation options (₹9/₹29/₹49 or $1/$3/$5 or €1/€3/€5)
+7. Click "Buy Me a Coffee" → opens BMAC in new tab (tracked via POST /api/donations/track)
+8. Click "Skip & view card →" to see the card immediately
+9. Card is accessible at /card/[slug] forever
 ```
-
-### Step 5: Test with Sandbox Accounts
-
-PayPal automatically creates sandbox buyer and seller accounts. Use the sandbox buyer credentials to test payments.
 
 ---
 
-## 🔧 Local Webhook Testing (ngrok)
+## ☕ Buy Me a Coffee Setup
 
-To test PayPal webhooks locally, use [ngrok](https://ngrok.com/):
-
-```bash
-# Install ngrok
-npm install -g ngrok
-
-# Start your dev server
-npm run dev
-
-# In another terminal, tunnel to localhost:3000
-ngrok http 3000
-```
-
-Copy the ngrok HTTPS URL (e.g., `https://abc123.ngrok.io`) and:
-
-1. Set the webhook URL in PayPal Dashboard to: `https://abc123.ngrok.io/api/paypal-webhook`
-2. Update `.env`:
+1. Create a free account at [buymeacoffee.com](https://www.buymeacoffee.com)
+2. Set your username in `.env`:
    ```env
-   NEXT_PUBLIC_BASE_URL=https://abc123.ngrok.io
+   BMAC_USERNAME=your-username
    ```
+3. Donation buttons will link to `https://www.buymeacoffee.com/your-username`
+
+> **Note:** If `BMAC_USERNAME` is not set, the donate page will show a warning. Cards are still created normally — donations are always optional.
+
+---
+
+## 🌍 Region/Currency Detection
+
+The donate page automatically detects the visitor's region and shows appropriate amounts:
+
+| Region | Currency | Amounts |
+|---|---|---|
+| India | INR ₹ | ₹9, ₹29, ₹49 |
+| US / Default | USD $ | $1, $3, $5 |
+| Europe | EUR € | €1, €3, €5 |
+
+Detection uses `navigator.language` and `Intl.DateTimeFormat` timezone — no API key required.
 
 ---
 
@@ -125,272 +109,112 @@ Copy the ngrok HTTPS URL (e.g., `https://abc123.ngrok.io`) and:
 ### Step 1: Push to GitHub
 
 ```bash
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/your-username/digital-happy-birthday-starter.git
+git init && git add . && git commit -m "Initial commit"
+git remote add origin https://github.com/your-username/your-repo.git
 git push -u origin main
 ```
 
 ### Step 2: Deploy on Vercel
 
 1. Go to [Vercel](https://vercel.com) and import your GitHub repo
-2. Configure environment variables in Vercel dashboard:
+2. Set environment variables:
 
 | Variable | Value |
 |---|---|
-| `PAYPAL_CLIENT_ID` | Your **live** PayPal Client ID |
-| `PAYPAL_CLIENT_SECRET` | Your **live** PayPal Secret |
-| `PAYPAL_WEBHOOK_ID` | Your webhook ID |
-| `NEXT_PUBLIC_PAYPAL_CLIENT_ID` | Same as PAYPAL_CLIENT_ID |
-| `NEXT_PUBLIC_BASE_URL` | `https://yourdomain.vercel.app` |
 | `ADMIN_TOKEN` | A strong random string |
 | `DATABASE_URL` | `./data/birthday-cards.db` |
+| `BMAC_USERNAME` | Your BMAC username |
+| `NEXT_PUBLIC_BASE_URL` | `https://yourdomain.vercel.app` |
 
-### Step 3: Switch to Live PayPal
-
-In your environment, the PayPal API base automatically uses sandbox. To switch to live:
-
-1. Use **live** credentials (not sandbox) from PayPal Dashboard → **Live**
-2. Set env var: `PAYPAL_API_BASE=https://api-m.paypal.com`
-
-> **⚠️ Important:** SQLite works on Vercel but data is **ephemeral** — it resets on each deployment. For persistent production data, switch to Supabase (see below).
+> **⚠️ Important:** SQLite on Vercel is **ephemeral** — data resets on each deployment. For persistent production data, switch to Supabase (see below).
 
 ---
 
-## 🔄 Switching to Supabase (Production)
-
-For persistent database in production:
-
-### Step 1: Create Supabase Project
-
-1. Go to [Supabase](https://supabase.com) and create a free project
-2. Get your project URL and service role key
-
-### Step 2: Create Tables
-
-Run this SQL in Supabase SQL editor:
-
-```sql
-CREATE TABLE cards (
-  id BIGSERIAL PRIMARY KEY,
-  slug TEXT UNIQUE,
-  card_json JSONB NOT NULL,
-  template_id TEXT NOT NULL DEFAULT 'pastel-heart',
-  status TEXT NOT NULL DEFAULT 'pending',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE payments (
-  id BIGSERIAL PRIMARY KEY,
-  card_id BIGINT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
-  paypal_order_id TEXT UNIQUE NOT NULL,
-  status TEXT NOT NULL DEFAULT 'created',
-  amount TEXT NOT NULL DEFAULT '19.00',
-  currency TEXT NOT NULL DEFAULT 'INR',
-  payer_email TEXT,
-  raw_response JSONB,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE TABLE replies (
-  id BIGSERIAL PRIMARY KEY,
-  card_id BIGINT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
-  message TEXT NOT NULL,
-  sender TEXT DEFAULT 'Anonymous',
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
-
-### Step 3: Update Code
-
-Replace `lib/db.ts` with Supabase client calls. See comments in the file for guidance.
-
-### Step 4: Set Environment Variables
-
-```env
-SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-```
-
----
-
-## 🔒 Security Notes
+## 🔒 Security & Privacy
 
 - **HTML Sanitization** — All user messages are sanitized server-side using `sanitize-html`
-- **CSP Headers** — Content Security Policy applied via Next.js middleware
-- **Secrets** — PayPal secret is never exposed to the client
-- **Rate Limiting** — In-memory rate limiter on create-order (5/min per IP)
+- **CSP Headers** — Content Security Policy allows only BMAC domains
+- **No Financial Data Stored** — Donations are processed entirely by BMAC; we only log clicks
+- **IP Anonymization** — Donation click IPs are hashed with a server-side salt
+- **Rate Limiting** — In-memory rate limiter on card creation (5/min per IP)
 - **Profanity Filter** — Basic wordlist filter with admin flagging
-- **Webhook Verification** — PayPal webhook signatures verified server-side
 - **ADMIN_TOKEN** — Admin dashboard protected by secret token
 
-### Production Recommendations
+### Data Stored
 
-- [ ] Use Redis-based rate limiting (`@upstash/ratelimit`)
-- [ ] Add Cloudflare or AWS WAF
-- [ ] Enable additional CSP reporting
-- [ ] Add CAPTCHA to the editor form
-- [ ] Implement more comprehensive content moderation (e.g., Perspective API)
+| Table | Data | PII? |
+|---|---|---|
+| `cards` | Card content, template, slug | Sender/recipient names |
+| `replies` | Reply messages, sender name | Sender name |
+| `donation_clicks` | Slug, provider, currency, amount, hashed IP | None (IP is hashed) |
 
----
+### GDPR Deletion
 
-## 🗑️ GDPR / Data Deletion
-
-### Delete a Card (Admin)
-
-**Soft delete** (hide from public, retain for audit):
 ```bash
-curl -X DELETE "http://localhost:3000/api/admin/card/1?token=YOUR_ADMIN_TOKEN"
+# Soft delete
+curl -X DELETE "http://localhost:3000/api/admin/card/1?token=YOUR_TOKEN"
+
+# Hard delete (permanent)
+curl -X DELETE "http://localhost:3000/api/admin/card/1?token=YOUR_TOKEN&hard=true"
 ```
-
-**Hard delete** (permanent, GDPR compliance):
-```bash
-curl -X DELETE "http://localhost:3000/api/admin/card/1?token=YOUR_ADMIN_TOKEN&hard=true"
-```
-
-### Data Retention
-
-- Cards are stored indefinitely unless deleted by admin
-- Payment audit records follow the same lifecycle as cards (cascade delete)
-- Replies are deleted with their parent card
 
 ---
 
 ## 🧪 Testing
 
 ```bash
-# Run all tests
-npm test
-
-# Watch mode
-npm run test:watch
+npm test          # Run all tests
+npm run test:watch # Watch mode
 ```
 
-Tests mock PayPal API responses. No real PayPal calls are made during testing.
+Tests cover: card creation, sanitization, profanity filtering, slug generation, donation tracking, and IP anonymization.
 
 ---
 
 ## 📁 Project Structure
 
 ```
-digital-happy-birthday-starter/
-├── app/                          # Next.js App Router
-│   ├── page.tsx                  # Landing page
-│   ├── layout.tsx                # Root layout + fonts + metadata
-│   ├── globals.css               # Tailwind + custom theme tokens
-│   ├── create/page.tsx           # Card editor
-│   ├── card/[slug]/              # Card display (SSR)
-│   │   ├── page.tsx
-│   │   └── CardPageClient.tsx
-│   ├── share/[slug]/page.tsx     # Post-payment share page
-│   ├── admin/page.tsx            # Admin dashboard
-│   └── api/                      # API routes
-│       ├── create-order/route.ts
-│       ├── capture-order/route.ts
-│       ├── paypal-webhook/route.ts
-│       ├── card/[slug]/route.ts
-│       ├── card/[slug]/reply/route.ts
-│       ├── snapshot/[slug]/route.ts
-│       ├── admin/cards/route.ts
-│       └── admin/card/[id]/route.ts
-├── components/
-│   ├── CakePreview.tsx           # SVG cake with shapes & candles
-│   ├── LottieAnimation.tsx       # Lottie wrapper
-│   ├── PayPalButton.tsx          # PayPal checkout button
-│   └── ShareButtons.tsx          # Social share buttons
-├── designs/
-│   └── templates.ts              # 4 template design specs
+├── app/
+│   ├── page.tsx                    # Landing page
+│   ├── create/page.tsx             # Card editor (free)
+│   ├── card/[slug]/                # Card display
+│   │   ├── page.tsx                # SSR card page
+│   │   ├── CardPageClient.tsx      # Interactive card
+│   │   └── donate/                 # Donate page
+│   │       ├── page.tsx            # SSR donate wrapper
+│   │       └── DonatePageClient.tsx # Donate UI
+│   ├── admin/page.tsx              # Admin dashboard
+│   └── api/
+│       ├── cards/route.ts          # POST — free card creation
+│       ├── donations/track/route.ts # POST — donation click tracking
+│       ├── card/[slug]/route.ts    # GET — card data
+│       ├── create-order/route.ts   # DISABLED (PayPal legacy)
+│       ├── capture-order/route.ts  # DISABLED (PayPal legacy)
+│       └── paypal-webhook/route.ts # DISABLED (PayPal legacy)
 ├── lib/
-│   ├── db.ts                     # SQLite database layer
-│   ├── paypal.ts                 # PayPal API helpers
-│   ├── sanitize.ts               # HTML sanitization
-│   ├── slug.ts                   # Slug generation
-│   ├── profanity.ts              # Profanity filter
-│   └── rate-limit.ts             # Rate limiter
+│   ├── db.ts                       # SQLite (cards, donation_clicks, replies)
+│   ├── detectCurrency.ts           # Client-side currency detection
+│   ├── sanitize.ts                 # HTML sanitization
+│   ├── slug.ts                     # Slug generation
+│   ├── profanity.ts                # Profanity filter
+│   └── rate-limit.ts               # Rate limiter
 ├── tests/
-│   ├── create-order.test.ts
-│   └── webhook.test.ts
-├── storage/                      # Local file uploads (dev)
-├── middleware.ts                  # Security headers + admin auth
+│   ├── create-card.test.ts         # Card creation tests
+│   └── donation-track.test.ts      # Donation tracking tests
 ├── .env.example
-├── .github/workflows/test.yml
-├── LICENSE                        # MIT
 └── README.md
 ```
 
 ---
 
-## 🎨 Template Designs
+## 🔁 Re-enabling PayPal (Optional)
 
-| Template | Fonts | Colors | Lottie Keywords |
-|---|---|---|---|
-| **Pastel Heart** | Poppins + Playfair Display | `#FFF7FB` `#FF9CCF` `#E85D9C` | heart burst, candle flicker, pastel confetti |
-| **Bold Neon** | Inter + Roboto Slab | `#0A0A1A` `#00FFAA` `#FF3CAC` | neon spark, animated sprinkles, glow candles |
-| **Classic Elegant** | Merriweather + Lato | `#FFFCF5` `#C9A84C` `#8B6914` | gold sparkle, slow confetti, flicker candle |
-| **Cute Cartoon** | Baloo 2 + Nunito | `#FFF9E6` `#4ECDC4` `#FF6B6B` | cartoon cake, confetti pop, cute candle |
+The original PayPal ₹19 checkout flow is preserved in commented-out code. To re-enable:
 
-### Adding Lottie Animations
-
-1. Search [LottieFiles](https://lottiefiles.com) for the keywords above
-2. Download free JSON files
-3. Place in `public/lottie/` directory
-4. Use `<LottieAnimation animationPath="/lottie/your-file.json" />`
-
----
-
-## ✅ Completion Checklist
-
-### Completed ✅
-
-- [x] Next.js App Router + TypeScript setup
-- [x] Tailwind CSS with template color tokens
-- [x] Landing page with CTA
-- [x] Card editor with all fields
-- [x] Live preview pane
-- [x] Template selector (4 designs)
-- [x] Font and color selector
-- [x] Cake shape/icing/candle options
-- [x] Confetti and music toggles
-- [x] PayPal Checkout integration (INR 19)
-- [x] Order creation and capture APIs
-- [x] Webhook verification with idempotency
-- [x] SQLite database (cards, payments, replies)
-- [x] Unique slug generation (base62, 8-char)
-- [x] Card display page (SSR + interactive)
-- [x] Confetti animation on card open
-- [x] Reply system for recipients
-- [x] Share page with social buttons
-- [x] Admin dashboard (token-protected)
-- [x] Card flagging and deletion (soft + GDPR hard)
-- [x] Payment audit log
-- [x] HTML sanitization (sanitize-html)
-- [x] Profanity filter
-- [x] Rate limiting (in-memory)
-- [x] CSP + security headers (middleware)
-- [x] Dynamic OG meta tags
-- [x] Unit tests (vitest)
-- [x] GitHub Actions CI
-- [x] MIT License
-- [x] .env.example
-
-### TODOs for Production Hardening
-
-- [ ] Add Lottie JSON assets (download from LottieFiles using template keywords)
-- [ ] Switch SQLite → Supabase/PostgreSQL for persistent storage
-- [ ] Switch local storage → Supabase Storage / S3
-- [ ] Add Redis rate limiting
-- [ ] Implement PNG snapshot generation (Puppeteer/Playwright)
-- [ ] Add CAPTCHA to editor form
-- [ ] Set up production PayPal (live credentials)
-- [ ] Add comprehensive content moderation
-- [ ] Add WAF (Cloudflare/AWS)
-- [ ] Add monitoring and error tracking (Sentry)
-- [ ] Implement background music player
-- [ ] Add more emoji/sticker options
-- [ ] Add multi-language support
+1. Set `FEATURE_FLAG_PAYPAL=true` in `.env`
+2. Restore `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET`, `NEXT_PUBLIC_PAYPAL_CLIENT_ID`
+3. Uncomment code in: `create-order/route.ts`, `capture-order/route.ts`, `paypal-webhook/route.ts`, `PayPalButton.tsx`
+4. Update `middleware.ts` CSP to allow PayPal domains
 
 ---
 
