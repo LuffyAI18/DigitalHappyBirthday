@@ -17,11 +17,21 @@ export type { CardRow, PaymentRow, ReplyRow, DonationClickRow, DonationAnalytics
 
 const USE_SUPABASE = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 
+// Are we running on Vercel? (Vercel sets this automatically)
+const IS_VERCEL = !!process.env.VERCEL;
+
 // ---------------------------------------------------------------------------
 // Dynamic imports — load the correct module lazily
 // ---------------------------------------------------------------------------
 
 async function getSqlite() {
+  if (IS_VERCEL) {
+    throw new Error(
+      'SQLite (better-sqlite3) cannot run on Vercel. ' +
+      'Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables ' +
+      'in your Vercel project settings to use Supabase instead.'
+    );
+  }
   return import('./db-sqlite');
 }
 
