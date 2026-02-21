@@ -1,323 +1,232 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
-
 // ---------------------------------------------------------------------------
-// Database Connection
+// Database Layer — Auto-selecting Proxy
 // ---------------------------------------------------------------------------
-// Uses SQLite via better-sqlite3 for zero-setup local dev.
+// Detects environment and exports the correct database implementation:
 //
-// 🔄 PRODUCTION SWITCH — Supabase
-// Replace this file with a Supabase client. Example:
-//   import { createClient } from '@supabase/supabase-js';
-//   const supabase = createClient(
-//     process.env.SUPABASE_URL!,
-//     process.env.SUPABASE_SERVICE_ROLE_KEY!
-//   );
-// Then rewrite each helper below to call supabase.from('cards')... etc.
+// • If SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are set → Supabase (async, PostgreSQL)
+// • Otherwise → SQLite (sync, better-sqlite3) for local development
+//
+// ALL exported functions are ASYNC (return Promises) regardless of backend.
+// Callers must always `await` database calls.
 // ---------------------------------------------------------------------------
 
-const DB_PATH = process.env.DATABASE_URL || './data/birthday-cards.db';
+import type { CardRow, PaymentRow, ReplyRow, DonationClickRow, DonationAnalytics } from './db-supabase';
 
-function getDbPath(): string {
-  const resolved = path.resolve(process.cwd(), DB_PATH);
-  const dir = path.dirname(resolved);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  return resolved;
+// Re-export types so callers only import from '@/lib/db'
+export type { CardRow, PaymentRow, ReplyRow, DonationClickRow, DonationAnalytics };
+
+const USE_SUPABASE = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+// ---------------------------------------------------------------------------
+// Dynamic imports — load the correct module lazily
+// ---------------------------------------------------------------------------
+
+async function getSqlite() {
+  return import('./db-sqlite');
 }
 
-let _db: Database.Database | null = null;
-
-export function getDb(): Database.Database {
-  if (!_db) {
-    _db = new Database(getDbPath());
-    _db.pragma('journal_mode = WAL');
-    _db.pragma('foreign_keys = ON');
-    initSchema(_db);
-  }
-  return _db;
-}
-
-// ---------------------------------------------------------------------------
-// Schema
-// ---------------------------------------------------------------------------
-function initSchema(db: Database.Database) {
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS cards (
-      id          INTEGER PRIMARY KEY AUTOINCREMENT,
-      slug        TEXT UNIQUE,
-      card_json   TEXT NOT NULL,
-      template_id TEXT NOT NULL DEFAULT 'pastel-heart',
-      status      TEXT NOT NULL DEFAULT 'pending',   -- pending | active | flagged | deleted
-      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    /* ---------------------------------------------------------------
-     * FEATURE_FLAG_PAYPAL — Legacy payments table kept for backwards
-     * compatibility. No new rows are created in the free-creation flow.
-     * Re-enable PayPal by setting FEATURE_FLAG_PAYPAL=true.
-     * --------------------------------------------------------------- */
-    CREATE TABLE IF NOT EXISTS payments (
-      id              INTEGER PRIMARY KEY AUTOINCREMENT,
-      card_id         INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
-      paypal_order_id TEXT UNIQUE NOT NULL,
-      status          TEXT NOT NULL DEFAULT 'created',
-      amount          TEXT NOT NULL DEFAULT '19.00',
-      currency        TEXT NOT NULL DEFAULT 'INR',
-      payer_email     TEXT,
-      raw_response    TEXT,
-      created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE TABLE IF NOT EXISTS replies (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      card_id    INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
-      message    TEXT NOT NULL,
-      sender     TEXT DEFAULT 'Anonymous',
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    /* ---------------------------------------------------------------
-     * Donation click analytics — tracks when users click donate buttons.
-     * No financial data or PII stored. IP is hashed server-side.
-     * --------------------------------------------------------------- */
-    CREATE TABLE IF NOT EXISTS donation_clicks (
-      id         INTEGER PRIMARY KEY AUTOINCREMENT,
-      card_slug  TEXT NOT NULL,
-      provider   TEXT NOT NULL DEFAULT 'bmac',  -- bmac | paypal | stripe
-      currency   TEXT NOT NULL DEFAULT 'USD',
-      amount     TEXT NOT NULL DEFAULT '0',
-      ip_hash    TEXT,
-      user_agent TEXT,
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
-    );
-
-    CREATE INDEX IF NOT EXISTS idx_cards_slug ON cards(slug);
-    CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(paypal_order_id);
-    CREATE INDEX IF NOT EXISTS idx_donation_clicks_slug ON donation_clicks(card_slug);
-  `);
+async function getSupabaseDb() {
+  return import('./db-supabase');
 }
 
 // ---------------------------------------------------------------------------
 // Card Helpers
 // ---------------------------------------------------------------------------
-export interface CardRow {
-  id: number;
-  slug: string | null;
-  card_json: string;
-  template_id: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
+
+export async function createCard(cardJson: string, templateId: string): Promise<number> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.createCard(cardJson, templateId);
+  }
+  const m = await getSqlite();
+  return m.createCard(cardJson, templateId);
 }
 
-export function createCard(cardJson: string, templateId: string): number {
-  const db = getDb();
-  const result = db
-    .prepare('INSERT INTO cards (card_json, template_id) VALUES (?, ?)')
-    .run(cardJson, templateId);
-  return result.lastInsertRowid as number;
+export async function getCardBySlug(slug: string): Promise<CardRow | undefined> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.getCardBySlug(slug);
+  }
+  const m = await getSqlite();
+  return m.getCardBySlug(slug);
 }
 
-export function getCardBySlug(slug: string): CardRow | undefined {
-  const db = getDb();
-  return db.prepare('SELECT * FROM cards WHERE slug = ? AND status != ?').get(slug, 'deleted') as
-    | CardRow
-    | undefined;
+export async function getCardById(id: number): Promise<CardRow | undefined> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.getCardById(id);
+  }
+  const m = await getSqlite();
+  return m.getCardById(id);
 }
 
-export function getCardById(id: number): CardRow | undefined {
-  const db = getDb();
-  return db.prepare('SELECT * FROM cards WHERE id = ?').get(id) as CardRow | undefined;
+export async function assignSlug(cardId: number, slug: string): Promise<void> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.assignSlug(cardId, slug);
+  }
+  const m = await getSqlite();
+  m.assignSlug(cardId, slug);
 }
 
-export function assignSlug(cardId: number, slug: string) {
-  const db = getDb();
-  db.prepare("UPDATE cards SET slug = ?, status = 'active', updated_at = datetime('now') WHERE id = ?").run(
-    slug,
-    cardId
-  );
-}
-
-/**
- * Create a card with a slug in one step (no payment required).
- * Used by the free card creation flow.
- */
-export function createCardWithSlug(
+export async function createCardWithSlug(
   cardJson: string,
   templateId: string,
   slug: string
-): number {
-  const db = getDb();
-  const result = db
-    .prepare(
-      "INSERT INTO cards (card_json, template_id, slug, status) VALUES (?, ?, ?, 'active')"
-    )
-    .run(cardJson, templateId, slug);
-  return result.lastInsertRowid as number;
+): Promise<number> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.createCardWithSlug(cardJson, templateId, slug);
+  }
+  const m = await getSqlite();
+  return m.createCardWithSlug(cardJson, templateId, slug);
 }
 
-export function slugExists(slug: string): boolean {
-  const db = getDb();
-  const row = db.prepare('SELECT 1 FROM cards WHERE slug = ?').get(slug);
-  return !!row;
+export async function slugExists(slug: string): Promise<boolean> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.slugExists(slug);
+  }
+  const m = await getSqlite();
+  return m.slugExists(slug);
 }
 
-export function listCards(limit = 50, offset = 0): CardRow[] {
-  const db = getDb();
-  return db
-    .prepare('SELECT * FROM cards ORDER BY created_at DESC LIMIT ? OFFSET ?')
-    .all(limit, offset) as CardRow[];
+export async function listCards(limit = 50, offset = 0): Promise<CardRow[]> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.listCards(limit, offset);
+  }
+  const m = await getSqlite();
+  return m.listCards(limit, offset);
 }
 
-export function flagCard(id: number) {
-  const db = getDb();
-  db.prepare("UPDATE cards SET status = 'flagged', updated_at = datetime('now') WHERE id = ?").run(id);
+export async function flagCard(id: number): Promise<void> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.flagCard(id);
+  }
+  const m = await getSqlite();
+  m.flagCard(id);
 }
 
-export function deleteCard(id: number) {
-  const db = getDb();
-  db.prepare("UPDATE cards SET status = 'deleted', updated_at = datetime('now') WHERE id = ?").run(id);
+export async function deleteCard(id: number): Promise<void> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.deleteCard(id);
+  }
+  const m = await getSqlite();
+  m.deleteCard(id);
 }
 
-export function hardDeleteCard(id: number) {
-  const db = getDb();
-  db.prepare('DELETE FROM cards WHERE id = ?').run(id);
+export async function hardDeleteCard(id: number): Promise<void> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.hardDeleteCard(id);
+  }
+  const m = await getSqlite();
+  m.hardDeleteCard(id);
 }
 
 // ---------------------------------------------------------------------------
-// Payment Helpers
+// Payment Helpers (Legacy — PayPal)
 // ---------------------------------------------------------------------------
-export interface PaymentRow {
-  id: number;
-  card_id: number;
-  paypal_order_id: string;
-  status: string;
-  amount: string;
-  currency: string;
-  payer_email: string | null;
-  raw_response: string | null;
-  created_at: string;
-  updated_at: string;
+
+export async function createPayment(cardId: number, paypalOrderId: string): Promise<number> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.createPayment(cardId, paypalOrderId);
+  }
+  const m = await getSqlite();
+  return m.createPayment(cardId, paypalOrderId);
 }
 
-export function createPayment(cardId: number, paypalOrderId: string): number {
-  const db = getDb();
-  const result = db
-    .prepare('INSERT INTO payments (card_id, paypal_order_id) VALUES (?, ?)')
-    .run(cardId, paypalOrderId);
-  return result.lastInsertRowid as number;
+export async function getPaymentByOrderId(orderId: string): Promise<PaymentRow | undefined> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.getPaymentByOrderId(orderId);
+  }
+  const m = await getSqlite();
+  return m.getPaymentByOrderId(orderId);
 }
 
-export function getPaymentByOrderId(orderId: string): PaymentRow | undefined {
-  const db = getDb();
-  return db.prepare('SELECT * FROM payments WHERE paypal_order_id = ?').get(orderId) as
-    | PaymentRow
-    | undefined;
-}
-
-export function markPaymentCompleted(
+export async function markPaymentCompleted(
   orderId: string,
   payerEmail?: string,
   rawResponse?: string
-) {
-  const db = getDb();
-  db.prepare(
-    "UPDATE payments SET status = 'completed', payer_email = ?, raw_response = ?, updated_at = datetime('now') WHERE paypal_order_id = ?"
-  ).run(payerEmail || null, rawResponse || null, orderId);
+): Promise<void> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.markPaymentCompleted(orderId, payerEmail, rawResponse);
+  }
+  const m = await getSqlite();
+  m.markPaymentCompleted(orderId, payerEmail, rawResponse);
 }
 
-export function getPaymentAuditLog(limit = 100): PaymentRow[] {
-  const db = getDb();
-  return db
-    .prepare('SELECT * FROM payments ORDER BY created_at DESC LIMIT ?')
-    .all(limit) as PaymentRow[];
+export async function getPaymentAuditLog(limit = 100): Promise<PaymentRow[]> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.getPaymentAuditLog(limit);
+  }
+  const m = await getSqlite();
+  return m.getPaymentAuditLog(limit);
 }
 
 // ---------------------------------------------------------------------------
 // Reply Helpers
 // ---------------------------------------------------------------------------
-export interface ReplyRow {
-  id: number;
-  card_id: number;
-  message: string;
-  sender: string;
-  created_at: string;
+
+export async function addReply(cardId: number, message: string, sender?: string): Promise<number> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.addReply(cardId, message, sender);
+  }
+  const m = await getSqlite();
+  return m.addReply(cardId, message, sender);
 }
 
-export function addReply(cardId: number, message: string, sender?: string): number {
-  const db = getDb();
-  const result = db
-    .prepare('INSERT INTO replies (card_id, message, sender) VALUES (?, ?, ?)')
-    .run(cardId, message, sender || 'Anonymous');
-  return result.lastInsertRowid as number;
-}
-
-export function getRepliesByCardId(cardId: number): ReplyRow[] {
-  const db = getDb();
-  return db
-    .prepare('SELECT * FROM replies WHERE card_id = ? ORDER BY created_at ASC')
-    .all(cardId) as ReplyRow[];
+export async function getRepliesByCardId(cardId: number): Promise<ReplyRow[]> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.getRepliesByCardId(cardId);
+  }
+  const m = await getSqlite();
+  return m.getRepliesByCardId(cardId);
 }
 
 // ---------------------------------------------------------------------------
 // Donation Click Analytics
 // ---------------------------------------------------------------------------
-// Tracks when users click donate buttons. No financial data stored.
-// IP addresses are hashed server-side for anonymization.
-// ---------------------------------------------------------------------------
 
-export interface DonationClickRow {
-  id: number;
-  card_slug: string;
-  provider: string;
-  currency: string;
-  amount: string;
-  ip_hash: string | null;
-  user_agent: string | null;
-  created_at: string;
-}
-
-export function trackDonationClick(
+export async function trackDonationClick(
   slug: string,
   provider: string,
   currency: string,
   amount: string,
   ipHash?: string,
   userAgent?: string
-): number {
-  const db = getDb();
-  const result = db
-    .prepare(
-      'INSERT INTO donation_clicks (card_slug, provider, currency, amount, ip_hash, user_agent) VALUES (?, ?, ?, ?, ?, ?)'
-    )
-    .run(slug, provider, currency, amount, ipHash || null, userAgent || null);
-  return result.lastInsertRowid as number;
+): Promise<number> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.trackDonationClick(slug, provider, currency, amount, ipHash, userAgent);
+  }
+  const m = await getSqlite();
+  return m.trackDonationClick(slug, provider, currency, amount, ipHash, userAgent);
 }
 
-export interface DonationAnalytics {
-  provider: string;
-  currency: string;
-  amount: string;
-  click_count: number;
+export async function getDonationAnalytics(): Promise<DonationAnalytics[]> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.getDonationAnalytics();
+  }
+  const m = await getSqlite();
+  return m.getDonationAnalytics();
 }
 
-export function getDonationAnalytics(): DonationAnalytics[] {
-  const db = getDb();
-  return db
-    .prepare(
-      'SELECT provider, currency, amount, COUNT(*) as click_count FROM donation_clicks GROUP BY provider, currency, amount ORDER BY click_count DESC'
-    )
-    .all() as DonationAnalytics[];
-}
-
-export function getDonationClicksBySlug(slug: string): DonationClickRow[] {
-  const db = getDb();
-  return db
-    .prepare('SELECT * FROM donation_clicks WHERE card_slug = ? ORDER BY created_at DESC')
-    .all(slug) as DonationClickRow[];
+export async function getDonationClicksBySlug(slug: string): Promise<DonationClickRow[]> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.getDonationClicksBySlug(slug);
+  }
+  const m = await getSqlite();
+  return m.getDonationClicksBySlug(slug);
 }

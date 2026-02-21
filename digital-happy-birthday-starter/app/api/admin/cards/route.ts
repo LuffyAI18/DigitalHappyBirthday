@@ -30,9 +30,9 @@ export async function GET(request: NextRequest) {
             request.nextUrl.searchParams.get('offset') || '0'
         );
 
-        const cards = listCards(limit, offset);
-        const payments = getPaymentAuditLog(limit);
-        const donationAnalytics = getDonationAnalytics();
+        const cards = await listCards(limit, offset);
+        const payments = await getPaymentAuditLog(limit);
+        const donationAnalytics = await getDonationAnalytics();
 
         return NextResponse.json({
             cards: cards.map((c) => ({

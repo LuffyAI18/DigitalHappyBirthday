@@ -30,7 +30,7 @@ export async function POST(
             );
         }
 
-        const card = getCardBySlug(slug);
+        const card = await getCardBySlug(slug);
         if (!card) {
             return NextResponse.json(
                 { error: 'Card not found' },
@@ -56,7 +56,7 @@ export async function POST(
             `${sanitizedMessage} ${sanitizedSender}`
         );
 
-        const replyId = addReply(
+        const replyId = await addReply(
             card.id,
             profanityCheck.hasProfanity
                 ? profanityCheck.filtered

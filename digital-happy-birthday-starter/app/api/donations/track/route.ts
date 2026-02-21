@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         const userAgent = request.headers.get('user-agent')?.slice(0, 200) || null;
 
         // --- Track click ---
-        trackDonationClick(
+        await trackDonationClick(
             slug,
             provider,
             currency,

@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the DB module
 vi.mock('@/lib/db', () => ({
-    trackDonationClick: vi.fn().mockReturnValue(1),
+    trackDonationClick: vi.fn().mockResolvedValue(1),
 }));
 
 // Mock rate-limit to always allow
@@ -45,7 +45,7 @@ describe('POST /api/donations/track — donation click analytics', () => {
 
         // Track the click
         const userAgent = 'Mozilla/5.0 (Test)';
-        trackDonationClick(
+        await trackDonationClick(
             clickData.slug,
             clickData.provider,
             clickData.currency,

@@ -8,8 +8,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock the DB module
 vi.mock('@/lib/db', () => ({
-    createCardWithSlug: vi.fn().mockReturnValue(1),
-    slugExists: vi.fn().mockReturnValue(false),
+    createCardWithSlug: vi.fn().mockResolvedValue(1),
+    slugExists: vi.fn().mockResolvedValue(false),
 }));
 
 // Mock rate-limit to always allow
@@ -53,8 +53,9 @@ describe('POST /api/cards — free card creation', () => {
         expect(profanityCheck.hasProfanity).toBe(false);
 
         // 3. Generate slug (no PayPal order needed!)
-        const slug = generateUniqueSlug();
+        const slug = await generateUniqueSlug();
         expect(slug).toBeTruthy();
+        expect(typeof slug).toBe('string');
         expect(slug.length).toBe(8); // base62 8-char slug
 
         // 4. Create card with slug in one step
@@ -70,7 +71,7 @@ describe('POST /api/cards — free card creation', () => {
             createdAt: expect.any(String),
         };
 
-        createCardWithSlug(
+        await createCardWithSlug(
             JSON.stringify(cardPayload),
             payload.templateId,
             slug
@@ -120,8 +121,8 @@ describe('POST /api/cards — free card creation', () => {
     it('should generate unique slugs', async () => {
         const { generateUniqueSlug } = await import('@/lib/slug');
 
-        const slug1 = generateUniqueSlug();
-        const slug2 = generateUniqueSlug();
+        const slug1 = await generateUniqueSlug();
+        const slug2 = await generateUniqueSlug();
 
         // Slugs should be 8 characters, base62
         expect(slug1).toMatch(/^[A-Za-z0-9]{8}$/);

@@ -68,10 +68,10 @@ export async function POST(request: NextRequest) {
         };
 
         // --- Generate unique slug ---
-        const slug = generateUniqueSlug();
+        const slug = await generateUniqueSlug();
 
         // --- Save card to DB with slug (active status, no payment needed) ---
-        createCardWithSlug(
+        await createCardWithSlug(
             JSON.stringify(cardPayload),
             templateId,
             slug

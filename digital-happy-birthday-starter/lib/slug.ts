@@ -26,10 +26,10 @@ function generateRandomSlug(length: number = SLUG_LENGTH): string {
  * Generate a unique base62 slug with collision checking.
  * Retries up to MAX_RETRIES times if a collision is found.
  */
-export function generateUniqueSlug(): string {
+export async function generateUniqueSlug(): Promise<string> {
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
         const slug = generateRandomSlug();
-        if (!slugExists(slug)) {
+        if (!(await slugExists(slug))) {
             return slug;
         }
     }

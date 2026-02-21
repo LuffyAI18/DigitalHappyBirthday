@@ -18,11 +18,11 @@ A production-ready, open-source starter for a **free** "Digital Happy Birthday /
 - **Interactive Card Experience** — Animated cake with candles, confetti burst, recipient replies
 - **Admin Dashboard** — View/flag/delete cards, donation click analytics, GDPR compliance
 - **Security** — CSP headers, HTML sanitization, profanity filter, rate limiting
-- **SQLite DB** — Zero-setup local database (with Supabase migration path)
+- **Dual DB Support** — SQLite for local dev, **Supabase (PostgreSQL)** for production
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start (Local Dev)
 
 ### Prerequisites
 
@@ -59,6 +59,8 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+> **Note:** For local development, SQLite is used automatically — no Supabase credentials needed.
+
 ---
 
 ## 🎯 User Flow
@@ -74,6 +76,168 @@ Open [http://localhost:3000](http://localhost:3000).
 8. Click "Skip & view card →" to see the card immediately
 9. Card is accessible at /card/[slug] forever
 ```
+
+---
+
+## 🚢 Production Deployment with Supabase + Vercel
+
+> **This is the recommended way to run in production.** SQLite on Vercel is ephemeral (data resets on deploy). Supabase gives you a persistent PostgreSQL database for free.
+
+### Step 1: Create a Supabase Project
+
+1. Go to [supabase.com](https://supabase.com) and sign in / sign up
+2. Click **"New Project"**
+3. Choose an organization, give it a name (e.g., `birthday-cards`), set a database password, pick your region
+4. Wait for the project to initialize (~30 seconds)
+
+### Step 2: Create All Tables (SQL Editor)
+
+1. In your Supabase dashboard, go to **SQL Editor** (left sidebar)
+2. Click **"New query"**
+3. Paste the following SQL and click **"Run"**:
+
+```sql
+-- =============================================================
+-- 🎂 Digital Happy Birthday — Supabase Schema
+-- =============================================================
+-- Run this ONCE in the Supabase SQL Editor to create all tables.
+-- =============================================================
+
+-- 1. Cards table
+CREATE TABLE IF NOT EXISTS cards (
+  id          BIGSERIAL PRIMARY KEY,
+  slug        TEXT UNIQUE,
+  card_json   JSONB NOT NULL,
+  template_id TEXT NOT NULL DEFAULT 'pastel-heart',
+  status      TEXT NOT NULL DEFAULT 'pending',
+  created_at  TIMESTAMPTZ DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 2. Payments table (legacy — for PayPal re-enablement)
+CREATE TABLE IF NOT EXISTS payments (
+  id              BIGSERIAL PRIMARY KEY,
+  card_id         BIGINT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+  paypal_order_id TEXT UNIQUE NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'created',
+  amount          TEXT NOT NULL DEFAULT '19.00',
+  currency        TEXT NOT NULL DEFAULT 'INR',
+  payer_email     TEXT,
+  raw_response    TEXT,
+  created_at      TIMESTAMPTZ DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 3. Replies table
+CREATE TABLE IF NOT EXISTS replies (
+  id         BIGSERIAL PRIMARY KEY,
+  card_id    BIGINT NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+  message    TEXT NOT NULL,
+  sender     TEXT DEFAULT 'Anonymous',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 4. Donation click analytics
+CREATE TABLE IF NOT EXISTS donation_clicks (
+  id         BIGSERIAL PRIMARY KEY,
+  card_slug  TEXT NOT NULL,
+  provider   TEXT NOT NULL DEFAULT 'bmac',
+  currency   TEXT NOT NULL DEFAULT 'USD',
+  amount     TEXT NOT NULL DEFAULT '0',
+  ip_hash    TEXT,
+  user_agent TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_cards_slug ON cards(slug);
+CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(paypal_order_id);
+CREATE INDEX IF NOT EXISTS idx_donation_clicks_slug ON donation_clicks(card_slug);
+```
+
+4. You should see **"Success. No rows returned"** — that means all 4 tables were created.
+
+### Step 3: (Recommended) Enable Row Level Security (RLS)
+
+Still in the **SQL Editor**, run this:
+
+```sql
+-- =============================================================
+-- Row Level Security (RLS) — Service Role bypasses these
+-- =============================================================
+-- The app uses SUPABASE_SERVICE_ROLE_KEY which bypasses RLS.
+-- But enabling RLS is best practice to prevent accidental
+-- exposure via the anon key.
+-- =============================================================
+
+ALTER TABLE cards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE replies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE donation_clicks ENABLE ROW LEVEL SECURITY;
+
+-- Allow service role full access (already implicit, but explicit is safer)
+CREATE POLICY "Service role has full access to cards"
+  ON cards FOR ALL
+  USING (auth.role() = 'service_role');
+
+CREATE POLICY "Service role has full access to payments"
+  ON payments FOR ALL
+  USING (auth.role() = 'service_role');
+
+CREATE POLICY "Service role has full access to replies"
+  ON replies FOR ALL
+  USING (auth.role() = 'service_role');
+
+CREATE POLICY "Service role has full access to donation_clicks"
+  ON donation_clicks FOR ALL
+  USING (auth.role() = 'service_role');
+```
+
+### Step 4: Get Your API Credentials
+
+1. In Supabase dashboard, go to **Settings → API** (or **Project Settings → API**)
+2. You need two values:
+
+| Value | Where to find it |
+|---|---|
+| **Project URL** | Under "Project URL" — looks like `https://abcdef123.supabase.co` |
+| **service_role key** | Under "Project API keys" → `service_role` (click "Reveal") |
+
+> ⚠️ **Never expose your `service_role` key in client-side code.** It bypasses RLS and has full DB access. It's only used server-side.
+
+### Step 5: Set Environment Variables on Vercel
+
+1. Push your code to GitHub:
+   ```bash
+   git init && git add . && git commit -m "Initial commit"
+   git remote add origin https://github.com/your-username/your-repo.git
+   git push -u origin main
+   ```
+
+2. Go to [Vercel](https://vercel.com) and import your GitHub repo
+
+3. In **Settings → Environment Variables**, add:
+
+   | Variable | Value |
+   |---|---|
+   | `SUPABASE_URL` | `https://your-project.supabase.co` |
+   | `SUPABASE_SERVICE_ROLE_KEY` | `your-service-role-key` |
+   | `ADMIN_TOKEN` | A strong random string (e.g., `openssl rand -hex 32`) |
+   | `BMAC_USERNAME` | Your Buy Me a Coffee username |
+   | `NEXT_PUBLIC_BASE_URL` | `https://yourdomain.vercel.app` |
+
+4. Click **Deploy**
+
+> 💡 **Auto-detection:** The app detects `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` at runtime. When both are set, it uses Supabase. When neither is set, it falls back to SQLite (local dev).
+
+### Step 6: Verify It's Working
+
+After deployment:
+
+1. **Create a card**: Visit `https://yourdomain.vercel.app/create` and create a test card
+2. **Check Supabase**: Go to your Supabase dashboard → **Table Editor** → `cards` table — you should see the new row
+3. **View the card**: Click the generated link to confirm the card displays correctly
+4. **Test admin**: Visit `https://yourdomain.vercel.app/api/admin/cards?token=YOUR_TOKEN`
 
 ---
 
@@ -104,32 +268,6 @@ Detection uses `navigator.language` and `Intl.DateTimeFormat` timezone — no AP
 
 ---
 
-## 🚢 Vercel Deployment
-
-### Step 1: Push to GitHub
-
-```bash
-git init && git add . && git commit -m "Initial commit"
-git remote add origin https://github.com/your-username/your-repo.git
-git push -u origin main
-```
-
-### Step 2: Deploy on Vercel
-
-1. Go to [Vercel](https://vercel.com) and import your GitHub repo
-2. Set environment variables:
-
-| Variable | Value |
-|---|---|
-| `ADMIN_TOKEN` | A strong random string |
-| `DATABASE_URL` | `./data/birthday-cards.db` |
-| `BMAC_USERNAME` | Your BMAC username |
-| `NEXT_PUBLIC_BASE_URL` | `https://yourdomain.vercel.app` |
-
-> **⚠️ Important:** SQLite on Vercel is **ephemeral** — data resets on each deployment. For persistent production data, switch to Supabase (see below).
-
----
-
 ## 🔒 Security & Privacy
 
 - **HTML Sanitization** — All user messages are sanitized server-side using `sanitize-html`
@@ -139,6 +277,7 @@ git push -u origin main
 - **Rate Limiting** — In-memory rate limiter on card creation (5/min per IP)
 - **Profanity Filter** — Basic wordlist filter with admin flagging
 - **ADMIN_TOKEN** — Admin dashboard protected by secret token
+- **RLS Enabled** — Supabase Row Level Security prevents accidental data exposure
 
 ### Data Stored
 
@@ -152,10 +291,10 @@ git push -u origin main
 
 ```bash
 # Soft delete
-curl -X DELETE "http://localhost:3000/api/admin/card/1?token=YOUR_TOKEN"
+curl -X DELETE "https://yoursite.com/api/admin/card/1?token=YOUR_TOKEN"
 
 # Hard delete (permanent)
-curl -X DELETE "http://localhost:3000/api/admin/card/1?token=YOUR_TOKEN&hard=true"
+curl -X DELETE "https://yoursite.com/api/admin/card/1?token=YOUR_TOKEN&hard=true"
 ```
 
 ---
@@ -192,7 +331,9 @@ Tests cover: card creation, sanitization, profanity filtering, slug generation, 
 │       ├── capture-order/route.ts  # DISABLED (PayPal legacy)
 │       └── paypal-webhook/route.ts # DISABLED (PayPal legacy)
 ├── lib/
-│   ├── db.ts                       # SQLite (cards, donation_clicks, replies)
+│   ├── db.ts                       # Auto-selecting DB proxy (Supabase or SQLite)
+│   ├── db-supabase.ts              # Supabase (PostgreSQL) — async
+│   ├── db-sqlite.ts                # SQLite (better-sqlite3) — local dev
 │   ├── detectCurrency.ts           # Client-side currency detection
 │   ├── sanitize.ts                 # HTML sanitization
 │   ├── slug.ts                     # Slug generation
@@ -204,6 +345,27 @@ Tests cover: card creation, sanitization, profanity filtering, slug generation, 
 ├── .env.example
 └── README.md
 ```
+
+### Database Architecture
+
+```
+                      ┌──────────────────┐
+                      │    lib/db.ts      │ ← Public API (all files import this)
+                      │  Auto-detecting   │
+                      │      proxy        │
+                      └───────┬──────────┘
+                              │
+              ┌───────────────┼───────────────┐
+              ▼                               ▼
+   ┌─────────────────┐          ┌──────────────────────┐
+   │  lib/db-sqlite.ts│          │  lib/db-supabase.ts   │
+   │  (better-sqlite3)│          │  (@supabase/supabase-js)│
+   │  Local dev only  │          │  Production (async)   │
+   └─────────────────┘          └──────────────────────┘
+```
+
+When `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set → Supabase is used.
+Otherwise → SQLite is used (zero setup for local development).
 
 ---
 
