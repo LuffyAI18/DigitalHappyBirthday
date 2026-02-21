@@ -15,7 +15,10 @@ export default function ShareButtons({
     slug,
     recipientName = 'someone special',
 }: ShareButtonsProps) {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const baseUrl =
+        typeof window !== 'undefined'
+            ? window.location.origin
+            : (process.env.NEXT_PUBLIC_BASE_URL || 'https://digitalhappybirthday.vercel.app');
     const cardUrl = `${baseUrl}/card/${slug}`;
     const shareText = `🎂 I made a birthday card for ${recipientName}! Check it out:`;
 
