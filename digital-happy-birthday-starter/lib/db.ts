@@ -50,16 +50,21 @@ function initSchema(db: Database.Database) {
       slug        TEXT UNIQUE,
       card_json   TEXT NOT NULL,
       template_id TEXT NOT NULL DEFAULT 'pastel-heart',
-      status      TEXT NOT NULL DEFAULT 'pending',   -- pending | paid | flagged | deleted
+      status      TEXT NOT NULL DEFAULT 'pending',   -- pending | active | flagged | deleted
       created_at  TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    /* ---------------------------------------------------------------
+     * FEATURE_FLAG_PAYPAL — Legacy payments table kept for backwards
+     * compatibility. No new rows are created in the free-creation flow.
+     * Re-enable PayPal by setting FEATURE_FLAG_PAYPAL=true.
+     * --------------------------------------------------------------- */
     CREATE TABLE IF NOT EXISTS payments (
       id              INTEGER PRIMARY KEY AUTOINCREMENT,
       card_id         INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
       paypal_order_id TEXT UNIQUE NOT NULL,
-      status          TEXT NOT NULL DEFAULT 'created', -- created | approved | completed | failed
+      status          TEXT NOT NULL DEFAULT 'created',
       amount          TEXT NOT NULL DEFAULT '19.00',
       currency        TEXT NOT NULL DEFAULT 'INR',
       payer_email     TEXT,
@@ -76,8 +81,24 @@ function initSchema(db: Database.Database) {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    /* ---------------------------------------------------------------
+     * Donation click analytics — tracks when users click donate buttons.
+     * No financial data or PII stored. IP is hashed server-side.
+     * --------------------------------------------------------------- */
+    CREATE TABLE IF NOT EXISTS donation_clicks (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      card_slug  TEXT NOT NULL,
+      provider   TEXT NOT NULL DEFAULT 'bmac',  -- bmac | paypal | stripe
+      currency   TEXT NOT NULL DEFAULT 'USD',
+      amount     TEXT NOT NULL DEFAULT '0',
+      ip_hash    TEXT,
+      user_agent TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_cards_slug ON cards(slug);
     CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(paypal_order_id);
+    CREATE INDEX IF NOT EXISTS idx_donation_clicks_slug ON donation_clicks(card_slug);
   `);
 }
 
@@ -116,10 +137,28 @@ export function getCardById(id: number): CardRow | undefined {
 
 export function assignSlug(cardId: number, slug: string) {
   const db = getDb();
-  db.prepare("UPDATE cards SET slug = ?, status = 'paid', updated_at = datetime('now') WHERE id = ?").run(
+  db.prepare("UPDATE cards SET slug = ?, status = 'active', updated_at = datetime('now') WHERE id = ?").run(
     slug,
     cardId
   );
+}
+
+/**
+ * Create a card with a slug in one step (no payment required).
+ * Used by the free card creation flow.
+ */
+export function createCardWithSlug(
+  cardJson: string,
+  templateId: string,
+  slug: string
+): number {
+  const db = getDb();
+  const result = db
+    .prepare(
+      "INSERT INTO cards (card_json, template_id, slug, status) VALUES (?, ?, ?, 'active')"
+    )
+    .run(cardJson, templateId, slug);
+  return result.lastInsertRowid as number;
 }
 
 export function slugExists(slug: string): boolean {
@@ -223,4 +262,62 @@ export function getRepliesByCardId(cardId: number): ReplyRow[] {
   return db
     .prepare('SELECT * FROM replies WHERE card_id = ? ORDER BY created_at ASC')
     .all(cardId) as ReplyRow[];
+}
+
+// ---------------------------------------------------------------------------
+// Donation Click Analytics
+// ---------------------------------------------------------------------------
+// Tracks when users click donate buttons. No financial data stored.
+// IP addresses are hashed server-side for anonymization.
+// ---------------------------------------------------------------------------
+
+export interface DonationClickRow {
+  id: number;
+  card_slug: string;
+  provider: string;
+  currency: string;
+  amount: string;
+  ip_hash: string | null;
+  user_agent: string | null;
+  created_at: string;
+}
+
+export function trackDonationClick(
+  slug: string,
+  provider: string,
+  currency: string,
+  amount: string,
+  ipHash?: string,
+  userAgent?: string
+): number {
+  const db = getDb();
+  const result = db
+    .prepare(
+      'INSERT INTO donation_clicks (card_slug, provider, currency, amount, ip_hash, user_agent) VALUES (?, ?, ?, ?, ?, ?)'
+    )
+    .run(slug, provider, currency, amount, ipHash || null, userAgent || null);
+  return result.lastInsertRowid as number;
+}
+
+export interface DonationAnalytics {
+  provider: string;
+  currency: string;
+  amount: string;
+  click_count: number;
+}
+
+export function getDonationAnalytics(): DonationAnalytics[] {
+  const db = getDb();
+  return db
+    .prepare(
+      'SELECT provider, currency, amount, COUNT(*) as click_count FROM donation_clicks GROUP BY provider, currency, amount ORDER BY click_count DESC'
+    )
+    .all() as DonationAnalytics[];
+}
+
+export function getDonationClicksBySlug(slug: string): DonationClickRow[] {
+  const db = getDb();
+  return db
+    .prepare('SELECT * FROM donation_clicks WHERE card_slug = ? ORDER BY created_at DESC')
+    .all(slug) as DonationClickRow[];
 }

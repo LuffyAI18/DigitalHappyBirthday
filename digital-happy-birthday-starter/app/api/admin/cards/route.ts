@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listCards, getPaymentAuditLog } from '@/lib/db';
+import { listCards, getPaymentAuditLog, getDonationAnalytics } from '@/lib/db';
 
 // ---------------------------------------------------------------------------
 // Admin API: GET /api/admin/cards
@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
 
         const cards = listCards(limit, offset);
         const payments = getPaymentAuditLog(limit);
+        const donationAnalytics = getDonationAnalytics();
 
         return NextResponse.json({
             cards: cards.map((c) => ({
@@ -39,6 +40,7 @@ export async function GET(request: NextRequest) {
                 card_json: JSON.parse(c.card_json),
             })),
             payments,
+            donationAnalytics,
             total: cards.length,
         });
     } catch (error) {
