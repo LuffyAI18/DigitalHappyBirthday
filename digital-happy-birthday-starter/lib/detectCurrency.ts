@@ -55,7 +55,7 @@ function countryToCurrency(countryCode: string): SupportedCurrency {
   if (countryCode === 'IN') return 'INR';
   if (countryCode === 'US') return 'USD';
   if (EUR_COUNTRIES.has(countryCode)) return 'EUR';
-  return 'INR'; // Default to INR
+  return 'USD'; // Default to USD for international users
 }
 
 // Map of common timezones to currencies (fallback)
@@ -151,8 +151,8 @@ export function detectCurrencyFromBrowser(): SupportedCurrency {
     // Intl not available — fall through
   }
 
-  // 3. Default to INR
-  return 'INR';
+  // 3. Default to USD for international users
+  return 'USD';
 }
 
 /**

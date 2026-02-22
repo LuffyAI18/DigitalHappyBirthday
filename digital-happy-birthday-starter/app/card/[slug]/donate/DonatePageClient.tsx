@@ -6,7 +6,7 @@ import Link from 'next/link';
 import CakePreview from '@/components/CakePreview';
 import type { TemplateDesign } from '@/designs/templates';
 import {
-    detectCurrency,
+    detectCurrencyAsync,
     DONATION_AMOUNTS,
     type SupportedCurrency,
 } from '@/lib/detectCurrency';
@@ -51,7 +51,7 @@ export default function DonatePageClient({
     const [showToast, setShowToast] = useState(false);
 
     useEffect(() => {
-        setCurrency(detectCurrency());
+        detectCurrencyAsync().then(setCurrency);
     }, []);
 
     const shareUrl =
