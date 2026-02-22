@@ -1,11 +1,10 @@
 // ---------------------------------------------------------------------------
 // Client-Side Currency Detection
 // ---------------------------------------------------------------------------
-// Uses navigator.language and timezone to infer the visitor's region and
-// select appropriate donation amounts. No API key required.
+// Uses IP-based geo detection (via free ipapi.co API) as primary method,
+// falls back to navigator.language and timezone.
 //
-// Supported currencies: INR, USD, EUR
-// Falls back to USD if detection is ambiguous.
+// Supported currencies: INR (default), USD, EUR
 // ---------------------------------------------------------------------------
 
 export type SupportedCurrency = 'INR' | 'USD' | 'EUR';
@@ -17,7 +16,7 @@ export interface DonationOption {
 
 export const DONATION_AMOUNTS: Record<SupportedCurrency, DonationOption[]> = {
   INR: [
-    { amount: 9, label: 'Donate ₹9' },
+    { amount: 19, label: 'Donate ₹19' },
     { amount: 29, label: 'Donate ₹29' },
     { amount: 49, label: 'Donate ₹49' },
   ],
@@ -45,7 +44,21 @@ export function getCurrencySymbol(currency: SupportedCurrency): string {
   }
 }
 
-// Map of common timezones to currencies (fallback when language tag is ambiguous)
+// Country codes that use EUR
+const EUR_COUNTRIES = new Set([
+  'DE', 'FR', 'ES', 'NL', 'IT', 'PT', 'AT', 'BE', 'FI', 'IE', 'GR',
+  'SK', 'SI', 'EE', 'LV', 'LT', 'MT', 'CY', 'LU', 'HR',
+]);
+
+// Map country code → currency
+function countryToCurrency(countryCode: string): SupportedCurrency {
+  if (countryCode === 'IN') return 'INR';
+  if (countryCode === 'US') return 'USD';
+  if (EUR_COUNTRIES.has(countryCode)) return 'EUR';
+  return 'INR'; // Default to INR
+}
+
+// Map of common timezones to currencies (fallback)
 const TIMEZONE_CURRENCY_MAP: Record<string, SupportedCurrency> = {
   'Asia/Kolkata': 'INR',
   'Asia/Calcutta': 'INR',
@@ -71,18 +84,38 @@ const TIMEZONE_CURRENCY_MAP: Record<string, SupportedCurrency> = {
 };
 
 /**
- * Detect the visitor's likely currency based on browser locale and timezone.
- *
- * Priority:
- * 1. navigator.language country subtag (e.g. en-IN → INR)
- * 2. Intl.DateTimeFormat timezone → currency mapping
- * 3. Default: USD
+ * Detect currency via IP-based geolocation (network-based).
+ * Uses the free ipapi.co API — no API key required.
+ * Returns null if detection fails (caller should use fallback).
  */
-export function detectCurrency(): SupportedCurrency {
-  if (typeof navigator === 'undefined') return 'USD';
+export async function detectCurrencyByIP(): Promise<SupportedCurrency | null> {
+  try {
+    const response = await fetch('https://ipapi.co/json/', {
+      signal: AbortSignal.timeout(3000), // 3s timeout
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (data.country_code) {
+      return countryToCurrency(data.country_code);
+    }
+    // ipapi.co also returns currency directly
+    if (data.currency === 'INR') return 'INR';
+    if (data.currency === 'USD') return 'USD';
+    if (data.currency === 'EUR') return 'EUR';
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fallback: detect currency from browser locale and timezone.
+ */
+export function detectCurrencyFromBrowser(): SupportedCurrency {
+  if (typeof navigator === 'undefined') return 'INR';
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const lang: string = navigator.language || (navigator as any).userLanguage || 'en-US';
+  const lang: string = navigator.language || (navigator as any).userLanguage || 'en-IN';
 
   // 1. Check language subtag for country hints
   if (lang.includes('-IN') || lang.toLowerCase() === 'hi' || lang.toLowerCase().startsWith('hi-')) {
@@ -118,6 +151,27 @@ export function detectCurrency(): SupportedCurrency {
     // Intl not available — fall through
   }
 
-  // 3. Default
-  return 'USD';
+  // 3. Default to INR
+  return 'INR';
+}
+
+/**
+ * Legacy sync function — returns browser-based detection immediately.
+ * Use detectCurrencyAsync() for IP-based detection.
+ */
+export function detectCurrency(): SupportedCurrency {
+  return detectCurrencyFromBrowser();
+}
+
+/**
+ * Async currency detection — tries IP geolocation first, then browser fallback.
+ * This gives the most accurate result based on the user's actual network location.
+ */
+export async function detectCurrencyAsync(): Promise<SupportedCurrency> {
+  // Try IP-based detection first (network location)
+  const ipCurrency = await detectCurrencyByIP();
+  if (ipCurrency) return ipCurrency;
+
+  // Fallback to browser locale
+  return detectCurrencyFromBrowser();
 }
