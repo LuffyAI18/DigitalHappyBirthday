@@ -231,11 +231,20 @@ export default function CardPageClient({
                             {/* Actions */}
                             <div className="flex flex-wrap gap-3 justify-center">
                                 <Link
-                                    href={`/share/${slug}`}
+                                    href={`/card/${slug}`}
                                     className="px-4 py-2 rounded-full text-sm font-medium border transition-all hover:scale-105"
                                     style={{
                                         borderColor: template.tailwindColors.accent,
                                         color: template.tailwindColors.primary,
+                                    }}
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        const url = `${window.location.origin}/card/${slug}`;
+                                        navigator.clipboard.writeText(url).then(() => {
+                                            alert('Card link copied to clipboard!');
+                                        }).catch(() => {
+                                            alert(`Share this link: ${url}`);
+                                        });
                                     }}
                                 >
                                     🔗 Share
