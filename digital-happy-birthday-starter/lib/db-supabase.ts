@@ -327,3 +327,61 @@ export async function getDonationClicksBySlug(slug: string): Promise<DonationCli
     if (error) throw new Error(`getDonationClicksBySlug: ${error.message}`);
     return data ?? [];
 }
+
+// ---------------------------------------------------------------------------
+// Data Expiry — Purge rows older than 7 days
+// ---------------------------------------------------------------------------
+
+export interface PurgeResult {
+    cards_deleted: number;
+    replies_deleted: number;
+    payments_deleted: number;
+    donation_clicks_deleted: number;
+}
+
+export async function purgeExpiredData(): Promise<PurgeResult> {
+    const sb = getSupabase();
+    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Delete in dependency order: children first, then parent
+
+    // 1. Donation clicks (no FK dependency)
+    const { data: dcData, error: dcErr } = await sb
+        .from('donation_clicks')
+        .delete()
+        .lt('created_at', cutoff)
+        .select('id');
+    if (dcErr) throw new Error(`purgeExpiredData (donation_clicks): ${dcErr.message}`);
+
+    // 2. Replies (FK → cards)
+    const { data: rData, error: rErr } = await sb
+        .from('replies')
+        .delete()
+        .lt('created_at', cutoff)
+        .select('id');
+    if (rErr) throw new Error(`purgeExpiredData (replies): ${rErr.message}`);
+
+    // 3. Payments (FK → cards)
+    const { data: pData, error: pErr } = await sb
+        .from('payments')
+        .delete()
+        .lt('created_at', cutoff)
+        .select('id');
+    if (pErr) throw new Error(`purgeExpiredData (payments): ${pErr.message}`);
+
+    // 4. Cards (parent table — last)
+    const { data: cData, error: cErr } = await sb
+        .from('cards')
+        .delete()
+        .lt('created_at', cutoff)
+        .select('id');
+    if (cErr) throw new Error(`purgeExpiredData (cards): ${cErr.message}`);
+
+    return {
+        cards_deleted: cData?.length ?? 0,
+        replies_deleted: rData?.length ?? 0,
+        payments_deleted: pData?.length ?? 0,
+        donation_clicks_deleted: dcData?.length ?? 0,
+    };
+}
+

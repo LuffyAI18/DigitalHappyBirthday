@@ -214,7 +214,15 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="py-8 px-4 text-center text-gray-500 text-sm">
         <p>
-          Made with ❤️ for birthday celebrations everywhere.{' '}
+          Made By{' '}
+          <a
+            href="https://www.linkedin.com/in/prajwal-m-d/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hover:text-pastel-400 underline font-medium"
+          >
+            Prajwal M D
+          </a>
           <span className="mx-2">•</span>
           <Link href="/admin" className="hover:text-pastel-400 underline">
             Admin

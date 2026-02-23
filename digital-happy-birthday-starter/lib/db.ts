@@ -10,10 +10,10 @@
 // Callers must always `await` database calls.
 // ---------------------------------------------------------------------------
 
-import type { CardRow, PaymentRow, ReplyRow, DonationClickRow, DonationAnalytics } from './db-supabase';
+import type { CardRow, PaymentRow, ReplyRow, DonationClickRow, DonationAnalytics, PurgeResult } from './db-supabase';
 
 // Re-export types so callers only import from '@/lib/db'
-export type { CardRow, PaymentRow, ReplyRow, DonationClickRow, DonationAnalytics };
+export type { CardRow, PaymentRow, ReplyRow, DonationClickRow, DonationAnalytics, PurgeResult };
 
 const USE_SUPABASE = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -239,4 +239,22 @@ export async function getDonationClicksBySlug(slug: string): Promise<DonationCli
   }
   const m = await getSqlite();
   return m.getDonationClicksBySlug(slug);
+}
+
+// ---------------------------------------------------------------------------
+// Data Expiry — Purge rows older than 7 days
+// ---------------------------------------------------------------------------
+
+export async function purgeExpiredData(): Promise<PurgeResult> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.purgeExpiredData();
+  }
+  // SQLite: not implemented for local dev (data is ephemeral anyway)
+  return {
+    cards_deleted: 0,
+    replies_deleted: 0,
+    payments_deleted: 0,
+    donation_clicks_deleted: 0,
+  };
 }
