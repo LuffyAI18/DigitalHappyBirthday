@@ -1,5 +1,14 @@
 import type { Metadata } from 'next';
-import { Inter, Playfair_Display } from 'next/font/google';
+import {
+  Inter,
+  Playfair_Display,
+  Poppins,
+  Roboto_Slab,
+  Merriweather,
+  Lato,
+  Baloo_2,
+  Nunito,
+} from 'next/font/google';
 import './globals.css';
 
 const inter = Inter({
@@ -11,6 +20,45 @@ const inter = Inter({
 const playfair = Playfair_Display({
   subsets: ['latin'],
   variable: '--font-playfair',
+  display: 'swap',
+});
+
+const poppins = Poppins({
+  subsets: ['latin'],
+  weight: ['400', '600', '700'],
+  variable: '--font-poppins',
+  display: 'swap',
+});
+
+const robotoSlab = Roboto_Slab({
+  subsets: ['latin'],
+  variable: '--font-roboto-slab',
+  display: 'swap',
+});
+
+const merriweather = Merriweather({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-merriweather',
+  display: 'swap',
+});
+
+const lato = Lato({
+  subsets: ['latin'],
+  weight: ['400', '700'],
+  variable: '--font-lato',
+  display: 'swap',
+});
+
+const baloo2 = Baloo_2({
+  subsets: ['latin'],
+  variable: '--font-baloo-2',
+  display: 'swap',
+});
+
+const nunito = Nunito({
+  subsets: ['latin'],
+  variable: '--font-nunito',
   display: 'swap',
 });
 
@@ -41,13 +89,24 @@ export const metadata: Metadata = {
   },
 };
 
+const fontVars = [
+  inter.variable,
+  playfair.variable,
+  poppins.variable,
+  robotoSlab.variable,
+  merriweather.variable,
+  lato.variable,
+  baloo2.variable,
+  nunito.variable,
+].join(' ');
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${playfair.variable}`}>
+    <html lang="en" className={fontVars}>
       <body className="font-sans antialiased">{children}</body>
     </html>
   );

@@ -109,3 +109,29 @@ body {
   background-size: 200% 100%;
   animation: shimmer 3s ease infinite;
 }
+
+/* Template font families */
+.font-poppins { font-family: var(--font-poppins), 'Poppins', sans-serif; }
+.font-playfair-display { font-family: var(--font-playfair), 'Playfair Display', serif; }
+.font-inter { font-family: var(--font-inter), 'Inter', sans-serif; }
+.font-roboto-slab { font-family: var(--font-roboto-slab), 'Roboto Slab', serif; }
+.font-merriweather { font-family: var(--font-merriweather), 'Merriweather', serif; }
+.font-lato { font-family: var(--font-lato), 'Lato', sans-serif; }
+.font-baloo-2 { font-family: var(--font-baloo-2), 'Baloo 2', cursive; }
+.font-nunito { font-family: var(--font-nunito), 'Nunito', sans-serif; }
+
+/* Rich text editor (contentEditable) */
+.rich-editor {
+  min-height: 6rem;
+  outline: none;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+.rich-editor:empty::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  pointer-events: none;
+}
+.rich-editor b, .rich-editor strong { font-weight: 700; }
+.rich-editor i, .rich-editor em { font-style: italic; }
+

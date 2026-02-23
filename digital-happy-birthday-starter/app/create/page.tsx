@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -49,11 +49,28 @@ const ICING_COLORS = [
 
 const EMOJI_LIST = ['🎂', '🎉', '🎈', '🎊', '🥳', '🌟', '💖', '🔥', '🎁', '✨', '🍰', '🧁', '🕯️', '🎶', '💐', '🦋'];
 
+// Map font names from templates to CSS variable font families
+const FONT_FAMILY_MAP: Record<string, string> = {
+    'Poppins': 'var(--font-poppins), Poppins, sans-serif',
+    'Playfair Display': 'var(--font-playfair), Playfair Display, serif',
+    'Inter': 'var(--font-inter), Inter, sans-serif',
+    'Roboto Slab': 'var(--font-roboto-slab), Roboto Slab, serif',
+    'Merriweather': 'var(--font-merriweather), Merriweather, serif',
+    'Lato': 'var(--font-lato), Lato, sans-serif',
+    'Baloo 2': 'var(--font-baloo-2), Baloo 2, cursive',
+    'Nunito': 'var(--font-nunito), Nunito, sans-serif',
+};
+
+function getFontFamily(fontName: string): string {
+    return FONT_FAMILY_MAP[fontName] || fontName;
+}
+
 export default function CreatePage() {
     const router = useRouter();
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
+    const editorRef = useRef<HTMLDivElement>(null);
 
     const [formData, setFormData] = useState<CardFormData>({
         to: 'Dear ',
@@ -76,6 +93,9 @@ export default function CreatePage() {
 
     const selectedTemplate = templates.find((t) => t.id === formData.templateId) || templates[0];
 
+    // Determine active font: user's choice or template's primary
+    const activeFont = formData.fontChoice || selectedTemplate.fontPrimary;
+
     const updateField = useCallback(
         <K extends keyof CardFormData>(key: K, value: CardFormData[K]) => {
             setFormData((prev) => ({ ...prev, [key]: value }));
@@ -96,13 +116,40 @@ export default function CreatePage() {
         []
     );
 
-    const insertEmoji = (emoji: string) => {
-        setFormData((prev) => ({
-            ...prev,
-            message: prev.message + emoji,
-        }));
-        setShowEmojiPicker(false);
-    };
+    // Sync contentEditable HTML into formData.message
+    const handleEditorInput = useCallback(() => {
+        if (editorRef.current) {
+            setFormData((prev) => ({
+                ...prev,
+                message: editorRef.current?.innerHTML || '',
+            }));
+        }
+    }, []);
+
+    // Bold: wrap selection or insert placeholder
+    const handleBold = useCallback(() => {
+        editorRef.current?.focus();
+        document.execCommand('bold', false);
+        handleEditorInput();
+    }, [handleEditorInput]);
+
+    // Italic: wrap selection or insert placeholder
+    const handleItalic = useCallback(() => {
+        editorRef.current?.focus();
+        document.execCommand('italic', false);
+        handleEditorInput();
+    }, [handleEditorInput]);
+
+    // Insert emoji at cursor in the contentEditable div
+    const insertEmoji = useCallback(
+        (emoji: string) => {
+            editorRef.current?.focus();
+            document.execCommand('insertText', false, ` ${emoji} `);
+            handleEditorInput();
+            setShowEmojiPicker(false);
+        },
+        [handleEditorInput]
+    );
 
     const isFormValid =
         formData.to.trim().length > 0 &&
@@ -141,30 +188,30 @@ export default function CreatePage() {
         <div className="min-h-screen">
             {/* Top nav */}
             <nav className="fixed top-0 w-full z-50 glass">
-                <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-                    <Link href="/" className="text-xl font-bold gradient-text font-serif">
+                <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 flex items-center justify-between">
+                    <Link href="/" className="text-lg sm:text-xl font-bold gradient-text font-serif">
                         🎂 HappyBirthday
                     </Link>
-                    <span className="text-sm text-gray-500">Create Your Card</span>
+                    <span className="text-xs sm:text-sm text-gray-500">Create Your Card</span>
                 </div>
             </nav>
 
-            <div className="pt-20 pb-12 px-4 max-w-6xl mx-auto">
-                <div className="grid lg:grid-cols-2 gap-8">
+            <div className="pt-16 sm:pt-20 pb-28 sm:pb-12 px-3 sm:px-4 max-w-6xl mx-auto">
+                <div className="grid lg:grid-cols-2 gap-6 lg:gap-8">
                     {/* ============ LEFT: Editor Form ============ */}
-                    <div className="space-y-6">
+                    <div className="space-y-4 sm:space-y-6">
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                         >
-                            <h1 className="text-3xl font-bold font-serif mb-2">Create Your Card</h1>
-                            <p className="text-gray-500 text-sm">
-                                Start with &ldquo;Dear &rdquo; — type a name or keep a gentle surprise.
+                            <h1 className="text-2xl sm:text-3xl font-bold font-serif mb-1 sm:mb-2">Create Your Card</h1>
+                            <p className="text-gray-500 text-xs sm:text-sm">
+                                Fill in the details, pick a template, and customize your cake.
                             </p>
                         </motion.div>
 
                         {/* To Field */}
-                        <div className="glass rounded-xl p-4">
+                        <div className="glass rounded-xl p-3 sm:p-4">
                             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                                 To
                             </label>
@@ -172,58 +219,52 @@ export default function CreatePage() {
                                 type="text"
                                 value={formData.to}
                                 onChange={(e) => updateField('to', e.target.value)}
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-pastel-300 focus:border-transparent outline-none transition-all"
+                                className="w-full px-3 sm:px-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-pastel-300 focus:border-transparent outline-none transition-all text-base"
                                 placeholder="Dear Friend"
                                 autoFocus
                             />
                         </div>
 
-                        {/* Message */}
-                        <div className="glass rounded-xl p-4">
+                        {/* Message — Rich Text Editor */}
+                        <div className="glass rounded-xl p-3 sm:p-4">
                             <div className="flex items-center justify-between mb-1.5">
                                 <label className="text-sm font-semibold text-gray-700">
                                     Message
                                 </label>
-                                <div className="flex gap-1">
+                                <div className="flex gap-1.5">
                                     <button
-                                        onClick={() =>
-                                            setFormData((prev) => ({
-                                                ...prev,
-                                                message: prev.message + '<b></b>',
-                                            }))
-                                        }
-                                        className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded font-bold"
-                                        title="Bold"
+                                        onClick={handleBold}
+                                        className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-xs bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded font-bold transition-colors"
+                                        title="Bold — select text first, then click"
+                                        type="button"
                                     >
                                         B
                                     </button>
                                     <button
-                                        onClick={() =>
-                                            setFormData((prev) => ({
-                                                ...prev,
-                                                message: prev.message + '<i></i>',
-                                            }))
-                                        }
-                                        className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded italic"
-                                        title="Italic"
+                                        onClick={handleItalic}
+                                        className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-xs bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded italic transition-colors"
+                                        title="Italic — select text first, then click"
+                                        type="button"
                                     >
                                         I
                                     </button>
                                     <div className="relative">
                                         <button
                                             onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                                            className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded"
-                                            title="Emoji"
+                                            className="w-8 h-8 sm:w-7 sm:h-7 flex items-center justify-center text-sm bg-gray-100 hover:bg-gray-200 active:bg-gray-300 rounded transition-colors"
+                                            title="Insert emoji"
+                                            type="button"
                                         >
                                             😊
                                         </button>
                                         {showEmojiPicker && (
-                                            <div className="absolute top-8 right-0 bg-white shadow-xl rounded-xl p-3 grid grid-cols-4 gap-2 z-20 border">
+                                            <div className="absolute top-10 right-0 bg-white shadow-xl rounded-xl p-3 grid grid-cols-8 gap-3 z-20 border min-w-[280px]">
                                                 {EMOJI_LIST.map((emoji) => (
                                                     <button
                                                         key={emoji}
                                                         onClick={() => insertEmoji(emoji)}
-                                                        className="text-xl hover:scale-125 transition-transform p-1"
+                                                        className="text-2xl hover:scale-125 transition-transform p-1 text-center"
+                                                        type="button"
                                                     >
                                                         {emoji}
                                                     </button>
@@ -233,17 +274,20 @@ export default function CreatePage() {
                                     </div>
                                 </div>
                             </div>
-                            <textarea
-                                value={formData.message}
-                                onChange={(e) => updateField('message', e.target.value)}
-                                rows={4}
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-pastel-300 focus:border-transparent outline-none transition-all resize-none"
-                                placeholder="Wishing you the happiest birthday! 🎉"
+                            <div
+                                ref={editorRef}
+                                contentEditable
+                                onInput={handleEditorInput}
+                                data-placeholder="Wishing you the happiest birthday! 🎉  Select text and click B or I to format."
+                                className="rich-editor w-full px-3 sm:px-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-pastel-300 focus:border-transparent transition-all text-base"
                             />
+                            <p className="text-xs text-gray-400 mt-1.5">
+                                💡 Type your message, select text, then press <strong>B</strong> or <strong>I</strong> to format.
+                            </p>
                         </div>
 
                         {/* From Field */}
-                        <div className="glass rounded-xl p-4">
+                        <div className="glass rounded-xl p-3 sm:p-4">
                             <label className="block text-sm font-semibold text-gray-700 mb-1.5">
                                 From
                             </label>
@@ -251,13 +295,13 @@ export default function CreatePage() {
                                 type="text"
                                 value={formData.from}
                                 onChange={(e) => updateField('from', e.target.value)}
-                                className="w-full px-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-pastel-300 focus:border-transparent outline-none transition-all"
+                                className="w-full px-3 sm:px-4 py-2.5 rounded-lg border border-gray-200 focus:ring-2 focus:ring-pastel-300 focus:border-transparent outline-none transition-all text-base"
                                 placeholder="Your name"
                             />
                         </div>
 
                         {/* Template Selector */}
-                        <div className="glass rounded-xl p-4">
+                        <div className="glass rounded-xl p-3 sm:p-4">
                             <label className="block text-sm font-semibold text-gray-700 mb-3">
                                 Choose Template
                             </label>
@@ -265,8 +309,12 @@ export default function CreatePage() {
                                 {templates.map((t) => (
                                     <motion.button
                                         key={t.id}
-                                        onClick={() => updateField('templateId', t.id)}
-                                        className={`p-4 rounded-xl border-2 transition-all text-left ${formData.templateId === t.id
+                                        onClick={() => {
+                                            updateField('templateId', t.id);
+                                            // Reset font choice when template changes
+                                            updateField('fontChoice', null);
+                                        }}
+                                        className={`p-3 sm:p-4 rounded-xl border-2 transition-all text-left ${formData.templateId === t.id
                                             ? 'border-pastel-400 shadow-lg scale-[1.02]'
                                             : 'border-transparent hover:border-gray-200'
                                             }`}
@@ -276,7 +324,10 @@ export default function CreatePage() {
                                     >
                                         <div
                                             className="text-sm font-bold mb-1"
-                                            style={{ color: t.tailwindColors.text }}
+                                            style={{
+                                                color: t.tailwindColors.text,
+                                                fontFamily: getFontFamily(t.fontPrimary),
+                                            }}
                                         >
                                             {t.name}
                                         </div>
@@ -295,7 +346,7 @@ export default function CreatePage() {
                         </div>
 
                         {/* Font Selector */}
-                        <div className="glass rounded-xl p-4">
+                        <div className="glass rounded-xl p-3 sm:p-4">
                             <label className="block text-sm font-semibold text-gray-700 mb-2">
                                 Font Style
                             </label>
@@ -304,30 +355,40 @@ export default function CreatePage() {
                                     onClick={() =>
                                         updateField('fontChoice', selectedTemplate.fontPrimary)
                                     }
-                                    className={`flex-1 px-4 py-3 rounded-xl border-2 text-center transition-all ${formData.fontChoice === selectedTemplate.fontPrimary ||
+                                    className={`flex-1 px-3 sm:px-4 py-3 rounded-xl border-2 text-center transition-all min-h-[48px] ${formData.fontChoice === selectedTemplate.fontPrimary ||
                                         (!formData.fontChoice)
                                         ? 'border-pastel-400 bg-pastel-50'
                                         : 'border-gray-200 hover:border-gray-300'
                                         }`}
                                 >
-                                    <span className="text-sm font-medium">{selectedTemplate.fontPrimary}</span>
+                                    <span
+                                        className="text-sm font-medium"
+                                        style={{ fontFamily: getFontFamily(selectedTemplate.fontPrimary) }}
+                                    >
+                                        {selectedTemplate.fontPrimary}
+                                    </span>
                                 </button>
                                 <button
                                     onClick={() =>
                                         updateField('fontChoice', selectedTemplate.fontAccent)
                                     }
-                                    className={`flex-1 px-4 py-3 rounded-xl border-2 text-center transition-all ${formData.fontChoice === selectedTemplate.fontAccent
+                                    className={`flex-1 px-3 sm:px-4 py-3 rounded-xl border-2 text-center transition-all min-h-[48px] ${formData.fontChoice === selectedTemplate.fontAccent
                                         ? 'border-pastel-400 bg-pastel-50'
                                         : 'border-gray-200 hover:border-gray-300'
                                         }`}
                                 >
-                                    <span className="text-sm font-medium">{selectedTemplate.fontAccent}</span>
+                                    <span
+                                        className="text-sm font-medium"
+                                        style={{ fontFamily: getFontFamily(selectedTemplate.fontAccent) }}
+                                    >
+                                        {selectedTemplate.fontAccent}
+                                    </span>
                                 </button>
                             </div>
                         </div>
 
                         {/* Cake Options */}
-                        <div className="glass rounded-xl p-4 space-y-4">
+                        <div className="glass rounded-xl p-3 sm:p-4 space-y-4">
                             <label className="block text-sm font-semibold text-gray-700">
                                 Cake Options
                             </label>
@@ -340,7 +401,7 @@ export default function CreatePage() {
                                         <button
                                             key={shape}
                                             onClick={() => updateCakeOption('shape', shape)}
-                                            className={`px-4 py-2 rounded-lg text-sm capitalize transition-all ${formData.cakeOptions.shape === shape
+                                            className={`px-3 sm:px-4 py-2.5 rounded-lg text-sm capitalize transition-all min-h-[44px] ${formData.cakeOptions.shape === shape
                                                 ? 'bg-pastel-400 text-white'
                                                 : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                                                 }`}
@@ -361,7 +422,7 @@ export default function CreatePage() {
                                         <button
                                             key={color.value}
                                             onClick={() => updateCakeOption('icingColor', color.value)}
-                                            className={`w-8 h-8 rounded-full border-2 transition-all ${formData.cakeOptions.icingColor === color.value
+                                            className={`w-9 h-9 sm:w-8 sm:h-8 rounded-full border-2 transition-all ${formData.cakeOptions.icingColor === color.value
                                                 ? 'border-gray-800 scale-110'
                                                 : 'border-gray-200 hover:border-gray-400'
                                                 }`}
@@ -373,7 +434,7 @@ export default function CreatePage() {
                             </div>
 
                             {/* Candles */}
-                            <div className="flex items-center gap-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input
                                         type="checkbox"
@@ -381,7 +442,7 @@ export default function CreatePage() {
                                         onChange={(e) =>
                                             updateCakeOption('showCandles', e.target.checked)
                                         }
-                                        className="w-4 h-4 rounded accent-pastel-400"
+                                        className="w-5 h-5 sm:w-4 sm:h-4 rounded accent-pastel-400"
                                     />
                                     <span className="text-sm">Show Candles</span>
                                 </label>
@@ -390,6 +451,7 @@ export default function CreatePage() {
                                         <span className="text-xs text-gray-500">Count:</span>
                                         <input
                                             type="number"
+                                            inputMode="numeric"
                                             min={1}
                                             max={10}
                                             value={formData.cakeOptions.candleCount}
@@ -399,19 +461,22 @@ export default function CreatePage() {
                                                     Math.min(10, Math.max(1, parseInt(e.target.value) || 1))
                                                 )
                                             }
-                                            className="w-16 px-2 py-1 border rounded text-sm text-center"
+                                            placeholder="1-10"
+                                            title="Maximum 10 candles"
+                                            className="w-20 px-3 py-2 border rounded-lg text-sm text-center min-h-[44px]"
                                         />
+                                        <span className="text-xs text-gray-400">Max 10</span>
                                     </div>
                                 )}
                             </div>
                         </div>
 
                         {/* Add-ons */}
-                        <div className="glass rounded-xl p-4 space-y-3">
+                        <div className="glass rounded-xl p-3 sm:p-4 space-y-3">
                             <label className="block text-sm font-semibold text-gray-700">
                                 Add-ons
                             </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
+                            <label className="flex items-center gap-2 cursor-pointer min-h-[44px]">
                                 <input
                                     type="checkbox"
                                     checked={formData.addOns.confetti}
@@ -421,11 +486,11 @@ export default function CreatePage() {
                                             addOns: { ...prev.addOns, confetti: e.target.checked },
                                         }))
                                     }
-                                    className="w-4 h-4 rounded accent-pastel-400"
+                                    className="w-5 h-5 sm:w-4 sm:h-4 rounded accent-pastel-400"
                                 />
                                 <span className="text-sm">🎊 Confetti animation</span>
                             </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
+                            <label className="flex items-center gap-2 cursor-pointer min-h-[44px]">
                                 <input
                                     type="checkbox"
                                     checked={formData.addOns.backgroundMusic}
@@ -438,7 +503,7 @@ export default function CreatePage() {
                                             },
                                         }))
                                     }
-                                    className="w-4 h-4 rounded accent-pastel-400"
+                                    className="w-5 h-5 sm:w-4 sm:h-4 rounded accent-pastel-400"
                                 />
                                 <span className="text-sm">
                                     🎵 Background music{' '}
@@ -455,14 +520,17 @@ export default function CreatePage() {
                     </div>
 
                     {/* ============ RIGHT: Live Preview + Complete Button ============ */}
-                    <div className="lg:sticky lg:top-20 lg:self-start space-y-6">
+                    <div className="lg:sticky lg:top-20 lg:self-start space-y-4 sm:space-y-6">
                         {/* Live Preview */}
                         <motion.div
                             className="rounded-2xl overflow-hidden shadow-xl"
-                            style={{ background: selectedTemplate.tailwindColors.bg }}
+                            style={{
+                                background: selectedTemplate.tailwindColors.bg,
+                                fontFamily: getFontFamily(activeFont),
+                            }}
                             layout
                         >
-                            <div className="p-6 text-center space-y-4">
+                            <div className="p-4 sm:p-6 text-center space-y-4">
                                 <AnimatePresence mode="wait">
                                     <motion.div
                                         key={formData.templateId}
@@ -473,8 +541,11 @@ export default function CreatePage() {
                                     >
                                         {/* Preview header */}
                                         <div
-                                            className="text-xl font-serif font-bold mb-2"
-                                            style={{ color: selectedTemplate.tailwindColors.primary }}
+                                            className="text-xl font-bold mb-2"
+                                            style={{
+                                                color: selectedTemplate.tailwindColors.primary,
+                                                fontFamily: getFontFamily(activeFont),
+                                            }}
                                         >
                                             {formData.to || 'Dear Friend'}
                                         </div>
@@ -490,12 +561,17 @@ export default function CreatePage() {
                                             />
                                         </div>
 
-                                        {/* Message preview */}
+                                        {/* Message preview — renders HTML from contentEditable */}
                                         <div
-                                            className="text-sm px-4 min-h-[3rem] leading-relaxed"
-                                            style={{ color: selectedTemplate.tailwindColors.text }}
+                                            className="text-sm px-3 sm:px-4 min-h-[3rem] leading-relaxed"
+                                            style={{
+                                                color: selectedTemplate.tailwindColors.text,
+                                                fontFamily: getFontFamily(activeFont),
+                                            }}
                                         >
-                                            {formData.message || (
+                                            {formData.message ? (
+                                                <span dangerouslySetInnerHTML={{ __html: formData.message }} />
+                                            ) : (
                                                 <span className="opacity-40 italic">
                                                     Your message will appear here...
                                                 </span>
@@ -511,7 +587,7 @@ export default function CreatePage() {
                                         </div>
 
                                         {/* Template badge */}
-                                        <div className="mt-4 flex justify-center gap-2">
+                                        <div className="mt-4 flex justify-center gap-2 flex-wrap">
                                             {formData.addOns.confetti && (
                                                 <span className="text-xs bg-white/60 px-2 py-1 rounded-full">
                                                     🎊 Confetti
@@ -528,19 +604,19 @@ export default function CreatePage() {
                             </div>
 
                             <div
-                                className="px-6 py-3 text-center text-xs font-medium"
+                                className="px-4 sm:px-6 py-3 text-center text-xs font-medium"
                                 style={{
                                     background: selectedTemplate.tailwindColors.accent,
                                     color: selectedTemplate.tailwindColors.bg,
                                 }}
                             >
-                                {selectedTemplate.name} Template • {selectedTemplate.fontPrimary}
+                                {selectedTemplate.name} Template • {activeFont}
                             </div>
                         </motion.div>
 
-                        {/* Complete & Save Section */}
+                        {/* Complete & Save Section — hidden on mobile (shown as fixed bar below) */}
                         <motion.div
-                            className="glass rounded-2xl p-6 space-y-4"
+                            className="hidden sm:block glass rounded-2xl p-4 sm:p-6 space-y-4"
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.3 }}
@@ -612,6 +688,26 @@ export default function CreatePage() {
                         </motion.div>
                     </div>
                 </div>
+            </div>
+
+            {/* Fixed bottom CTA for mobile */}
+            <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-gray-200 px-4 py-3 safe-area-pb">
+                {saveError && (
+                    <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+                        {saveError}
+                        <button onClick={() => setSaveError(null)} className="ml-1 underline">
+                            Dismiss
+                        </button>
+                    </div>
+                )}
+                <button
+                    onClick={handleComplete}
+                    disabled={!isFormValid || saving}
+                    className="w-full py-3.5 rounded-xl text-base font-semibold text-white shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ background: isFormValid ? '#E85D9C' : '#ccc' }}
+                >
+                    {saving ? 'Saving...' : '🎂 Complete & Save Card — Free'}
+                </button>
             </div>
         </div>
     );
