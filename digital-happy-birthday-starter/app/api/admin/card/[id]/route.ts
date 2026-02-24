@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCardById, deleteCard, flagCard, hardDeleteCard } from '@/lib/db';
+import { getCardById, deleteCard, flagCard, hardDeleteCard, restoreCard } from '@/lib/db';
 
 // ---------------------------------------------------------------------------
 // Admin API: /api/admin/card/[id]
 // ---------------------------------------------------------------------------
 // GET — view card details with payment audit
 // DELETE — soft-delete or hard-delete a card (GDPR compliance)
-// PATCH — flag/unflag a card
+// PATCH — flag/unflag a card, or restore a deleted card
 // ---------------------------------------------------------------------------
 
 function verifyAdmin(request: NextRequest): boolean {
@@ -60,7 +60,7 @@ export async function DELETE(
     const hard = request.nextUrl.searchParams.get('hard') === 'true';
 
     if (hard) {
-        // GDPR: permanently delete all card data including payments and replies
+        // GDPR: permanently delete all card data
         await hardDeleteCard(cardId);
         return NextResponse.json({
             message: 'Card permanently deleted (GDPR)',
@@ -96,8 +96,13 @@ export async function PATCH(
         return NextResponse.json({ message: 'Card flagged' });
     }
 
+    if (body.action === 'restore') {
+        await restoreCard(cardId);
+        return NextResponse.json({ message: 'Card restored — new 7-day expiry set' });
+    }
+
     return NextResponse.json(
-        { error: 'Unknown action' },
+        { error: 'Unknown action. Valid actions: flag, restore' },
         { status: 400 }
     );
 }

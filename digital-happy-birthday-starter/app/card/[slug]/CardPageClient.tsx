@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import Link from 'next/link';
 import CakePreview from '@/components/CakePreview';
+import ShareButtons from '@/components/ShareButtons';
+import OpenSurprise from '@/components/OpenSurprise';
 import type { TemplateDesign } from '@/designs/templates';
-import type { ReplyRow } from '@/lib/db';
 
 // ---------------------------------------------------------------------------
 // Card Page Client — Interactive animated card experience
@@ -30,109 +30,21 @@ interface CardPageClientProps {
         };
     };
     template: TemplateDesign;
-    replies: ReplyRow[];
-}
-
-// Simple confetti particle component
-function ConfettiParticle({ delay, x }: { delay: number; x: number }) {
-    const colors = ['#FF9CCF', '#FFD700', '#00FFAA', '#FF6B6B', '#4ECDC4', '#FF3CAC'];
-    const color = colors[Math.floor(Math.random() * colors.length)];
-
-    return (
-        <motion.div
-            className="fixed w-3 h-3 rounded-sm z-50 pointer-events-none"
-            style={{ background: color, left: `${x}%` }}
-            initial={{ top: -20, rotate: 0, opacity: 1 }}
-            animate={{
-                top: '110vh',
-                rotate: 720,
-                opacity: 0,
-            }}
-            transition={{
-                duration: 3 + Math.random() * 2,
-                delay,
-                ease: 'easeIn',
-            }}
-        />
-    );
 }
 
 export default function CardPageClient({
     slug,
     cardData,
     template,
-    replies: initialReplies,
 }: CardPageClientProps) {
     const [isOpened, setIsOpened] = useState(false);
-    const [showConfetti, setShowConfetti] = useState(false);
-    const [replyText, setReplyText] = useState('');
-    const [replySender, setReplySender] = useState('');
-    const [replies, setReplies] = useState(initialReplies);
-    const [replySending, setReplySending] = useState(false);
-    const [replySuccess, setReplySuccess] = useState(false);
-
-    const handleOpenCake = () => {
-        setIsOpened(true);
-        if (cardData.addOns.confetti) {
-            setShowConfetti(true);
-            setTimeout(() => setShowConfetti(false), 5000);
-        }
-    };
-
-    const handleSendReply = async () => {
-        if (!replyText.trim()) return;
-        setReplySending(true);
-
-        try {
-            const res = await fetch(`/api/card/${slug}/reply`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    message: replyText,
-                    sender: replySender || 'Anonymous',
-                }),
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                setReplies((prev) => [
-                    ...prev,
-                    {
-                        id: data.id,
-                        card_id: 0,
-                        message: replyText,
-                        sender: replySender || 'Anonymous',
-                        created_at: new Date().toISOString(),
-                    },
-                ]);
-                setReplyText('');
-                setReplySuccess(true);
-                setTimeout(() => setReplySuccess(false), 3000);
-            }
-        } catch (err) {
-            console.error('Reply error:', err);
-        } finally {
-            setReplySending(false);
-        }
-    };
+    const [showSharePanel, setShowSharePanel] = useState(false);
 
     return (
         <div
             className="min-h-screen flex flex-col items-center justify-center p-4"
             style={{ background: template.tailwindColors.bg }}
         >
-            {/* Confetti */}
-            <AnimatePresence>
-                {showConfetti &&
-                    Array.from({ length: 40 }).map((_, i) => (
-                        <ConfettiParticle
-                            key={i}
-                            delay={i * 0.08}
-                            x={Math.random() * 100}
-                        />
-                    ))}
-            </AnimatePresence>
-
             <motion.div
                 className="max-w-lg w-full rounded-3xl shadow-2xl overflow-hidden"
                 style={{ background: template.tailwindColors.surface }}
@@ -175,154 +87,92 @@ export default function CardPageClient({
                 </motion.div>
 
                 {/* Open CTA or Message */}
-                <AnimatePresence mode="wait">
-                    {!isOpened ? (
-                        <motion.div
-                            key="cta"
-                            className="px-6 pb-6 text-center"
-                            exit={{ opacity: 0, scale: 0.9 }}
-                        >
-                            <motion.button
-                                onClick={handleOpenCake}
-                                className="px-8 py-3 rounded-full text-lg font-bold shadow-lg transition-all"
-                                style={{
-                                    background: template.tailwindColors.accent,
-                                    color: template.tailwindColors.bg,
-                                }}
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                                animate={{
-                                    boxShadow: [
-                                        `0 0 0px ${template.tailwindColors.accent}40`,
-                                        `0 0 25px ${template.tailwindColors.accent}60`,
-                                        `0 0 0px ${template.tailwindColors.accent}40`,
-                                    ],
-                                }}
-                                transition={{
-                                    boxShadow: { repeat: Infinity, duration: 2 },
-                                }}
+                <div className="px-6 pb-6">
+                    <AnimatePresence mode="wait">
+                        {!isOpened ? (
+                            <motion.div
+                                key="cta"
+                                className="text-center"
+                                exit={{ opacity: 0, scale: 0.9 }}
                             >
-                                🎂 Open Your Card!
-                            </motion.button>
-                        </motion.div>
-                    ) : (
-                        <motion.div
-                            key="message"
-                            className="px-6 pb-6"
-                            initial={{ opacity: 0, y: 30 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.5 }}
-                        >
-                            {/* Message */}
-                            <div
-                                className="text-center text-lg leading-relaxed mb-4 whitespace-pre-wrap"
-                                style={{ color: template.tailwindColors.text }}
-                                dangerouslySetInnerHTML={{ __html: cardData.message }}
-                            />
-
-                            {/* From */}
-                            <div
-                                className="text-right text-sm font-medium mb-6"
-                                style={{ color: template.tailwindColors.accent }}
-                            >
-                                With love, {cardData.from} 💝
-                            </div>
-
-                            {/* Actions */}
-                            <div className="flex flex-wrap gap-3 justify-center">
-                                <Link
-                                    href={`/card/${slug}`}
-                                    className="px-4 py-2 rounded-full text-sm font-medium border transition-all hover:scale-105"
-                                    style={{
-                                        borderColor: template.tailwindColors.accent,
-                                        color: template.tailwindColors.primary,
-                                    }}
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        const url = `${window.location.origin}/card/${slug}`;
-                                        navigator.clipboard.writeText(url).then(() => {
-                                            alert('Card link copied to clipboard!');
-                                        }).catch(() => {
-                                            alert(`Share this link: ${url}`);
-                                        });
-                                    }}
+                                <OpenSurprise
+                                    onComplete={() => setIsOpened(true)}
+                                    templateAccent={template.tailwindColors.accent}
                                 >
-                                    🔗 Share
-                                </Link>
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-            </motion.div>
-
-            {/* Reply Section (visible after opening) */}
-            {isOpened && (
-                <motion.div
-                    className="max-w-lg w-full mt-6 rounded-2xl p-6 shadow-lg"
-                    style={{ background: template.tailwindColors.surface }}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5 }}
-                >
-                    <h3
-                        className="text-lg font-bold mb-3"
-                        style={{ color: template.tailwindColors.text }}
-                    >
-                        💬 Send a Reply
-                    </h3>
-
-                    <div className="space-y-3">
-                        <input
-                            type="text"
-                            placeholder="Your name (optional)"
-                            value={replySender}
-                            onChange={(e) => setReplySender(e.target.value)}
-                            className="w-full px-4 py-2 rounded-lg border text-sm"
-                            style={{ borderColor: template.tailwindColors.accent + '40' }}
-                        />
-                        <textarea
-                            placeholder="Write a short reply..."
-                            value={replyText}
-                            onChange={(e) => setReplyText(e.target.value)}
-                            rows={2}
-                            className="w-full px-4 py-2 rounded-lg border resize-none text-sm"
-                            style={{ borderColor: template.tailwindColors.accent + '40' }}
-                        />
-                        <button
-                            onClick={handleSendReply}
-                            disabled={replySending || !replyText.trim()}
-                            className="px-6 py-2 rounded-full text-sm font-medium text-white disabled:opacity-50 transition-all"
-                            style={{ background: template.tailwindColors.accent }}
-                        >
-                            {replySending ? 'Sending...' : '📨 Send Reply'}
-                        </button>
-
-                        {replySuccess && (
-                            <p className="text-sm text-green-600">✅ Reply sent!</p>
-                        )}
-                    </div>
-
-                    {/* Existing replies */}
-                    {replies.length > 0 && (
-                        <div className="mt-4 space-y-2">
-                            <h4 className="text-sm font-semibold text-gray-500">Replies</h4>
-                            {replies.map((reply) => (
+                                    {/* This renders INSIDE OpenSurprise after reveal */}
+                                    <div>
+                                        <div
+                                            className="text-center text-lg leading-relaxed mb-4 whitespace-pre-wrap"
+                                            style={{ color: template.tailwindColors.text }}
+                                            dangerouslySetInnerHTML={{ __html: cardData.message }}
+                                        />
+                                        <div
+                                            className="text-right text-sm font-medium mb-4"
+                                            style={{ color: template.tailwindColors.accent }}
+                                        >
+                                            With love, {cardData.from} 💝
+                                        </div>
+                                    </div>
+                                </OpenSurprise>
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                key="message"
+                                initial={{ opacity: 0, y: 30 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
+                            >
+                                {/* Message */}
                                 <div
-                                    key={reply.id}
-                                    className="p-3 rounded-lg text-sm"
-                                    style={{
-                                        background: template.tailwindColors.bg,
-                                        color: template.tailwindColors.text,
-                                    }}
+                                    className="text-center text-lg leading-relaxed mb-4 whitespace-pre-wrap"
+                                    style={{ color: template.tailwindColors.text }}
+                                    dangerouslySetInnerHTML={{ __html: cardData.message }}
+                                />
+
+                                {/* From */}
+                                <div
+                                    className="text-right text-sm font-medium mb-6"
+                                    style={{ color: template.tailwindColors.accent }}
                                 >
-                                    <span className="font-medium">{reply.sender}:</span>{' '}
-                                    {reply.message}
+                                    With love, {cardData.from} 💝
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                </motion.div>
-            )}
+
+                                {/* Share toggle */}
+                                <div className="mb-4">
+                                    <button
+                                        onClick={() => setShowSharePanel(!showSharePanel)}
+                                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                        style={{
+                                            borderColor: template.tailwindColors.accent,
+                                            color: template.tailwindColors.primary,
+                                        }}
+                                    >
+                                        {showSharePanel ? '✕ Close' : '🔗 Share this card'}
+                                    </button>
+                                </div>
+
+                                {/* Share Panel */}
+                                <AnimatePresence>
+                                    {showSharePanel && (
+                                        <motion.div
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: 'auto' }}
+                                            exit={{ opacity: 0, height: 0 }}
+                                            transition={{ duration: 0.3 }}
+                                        >
+                                            <ShareButtons
+                                                slug={slug}
+                                                recipientName={cardData.to}
+                                                senderName={cardData.from}
+                                            />
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+            </motion.div>
 
             {/* Footer */}
             <p className="mt-8 text-xs opacity-60">

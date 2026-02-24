@@ -34,15 +34,18 @@ export interface CardRow {
     card_json: string;
     template_id: string;
     status: string;
+    expires_at: string | null;
+    is_deleted: boolean;
     created_at: string;
     updated_at: string;
 }
 
 export async function createCard(cardJson: string, templateId: string): Promise<number> {
     const sb = getSupabase();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await sb
         .from('cards')
-        .insert({ card_json: cardJson, template_id: templateId })
+        .insert({ card_json: cardJson, template_id: templateId, expires_at: expiresAt })
         .select('id')
         .single();
     if (error) throw new Error(`createCard: ${error.message}`);
@@ -56,6 +59,7 @@ export async function getCardBySlug(slug: string): Promise<CardRow | undefined> 
         .select('*')
         .eq('slug', slug)
         .neq('status', 'deleted')
+        .eq('is_deleted', false)
         .single();
     if (error && error.code !== 'PGRST116') throw new Error(`getCardBySlug: ${error.message}`);
     return data ?? undefined;
@@ -87,9 +91,10 @@ export async function createCardWithSlug(
     slug: string
 ): Promise<number> {
     const sb = getSupabase();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const { data, error } = await sb
         .from('cards')
-        .insert({ card_json: cardJson, template_id: templateId, slug, status: 'active' })
+        .insert({ card_json: cardJson, template_id: templateId, slug, status: 'active', expires_at: expiresAt })
         .select('id')
         .single();
     if (error) throw new Error(`createCardWithSlug: ${error.message}`);
@@ -130,7 +135,7 @@ export async function deleteCard(id: number): Promise<void> {
     const sb = getSupabase();
     const { error } = await sb
         .from('cards')
-        .update({ status: 'deleted', updated_at: new Date().toISOString() })
+        .update({ status: 'deleted', is_deleted: true, updated_at: new Date().toISOString() })
         .eq('id', id);
     if (error) throw new Error(`deleteCard: ${error.message}`);
 }
@@ -209,8 +214,12 @@ export async function getPaymentAuditLog(limit = 100): Promise<PaymentRow[]> {
 }
 
 // ---------------------------------------------------------------------------
-// Reply Helpers
+// Reply Helpers — REMOVED (feature disabled)
 // ---------------------------------------------------------------------------
+// FEATURE_FLAG_REPLIES: Reply feature has been removed.
+// To re-enable, uncomment below and restore the reply API route.
+// ---------------------------------------------------------------------------
+
 export interface ReplyRow {
     id: number;
     card_id: number;
@@ -219,27 +228,27 @@ export interface ReplyRow {
     created_at: string;
 }
 
-export async function addReply(cardId: number, message: string, sender?: string): Promise<number> {
-    const sb = getSupabase();
-    const { data, error } = await sb
-        .from('replies')
-        .insert({ card_id: cardId, message, sender: sender || 'Anonymous' })
-        .select('id')
-        .single();
-    if (error) throw new Error(`addReply: ${error.message}`);
-    return data.id;
-}
+// export async function addReply(cardId: number, message: string, sender?: string): Promise<number> {
+//     const sb = getSupabase();
+//     const { data, error } = await sb
+//         .from('replies')
+//         .insert({ card_id: cardId, message, sender: sender || 'Anonymous' })
+//         .select('id')
+//         .single();
+//     if (error) throw new Error(`addReply: ${error.message}`);
+//     return data.id;
+// }
 
-export async function getRepliesByCardId(cardId: number): Promise<ReplyRow[]> {
-    const sb = getSupabase();
-    const { data, error } = await sb
-        .from('replies')
-        .select('*')
-        .eq('card_id', cardId)
-        .order('created_at', { ascending: true });
-    if (error) throw new Error(`getRepliesByCardId: ${error.message}`);
-    return data ?? [];
-}
+// export async function getRepliesByCardId(cardId: number): Promise<ReplyRow[]> {
+//     const sb = getSupabase();
+//     const { data, error } = await sb
+//         .from('replies')
+//         .select('*')
+//         .eq('card_id', cardId)
+//         .order('created_at', { ascending: true });
+//     if (error) throw new Error(`getRepliesByCardId: ${error.message}`);
+//     return data ?? [];
+// }
 
 // ---------------------------------------------------------------------------
 // Donation Click Analytics
@@ -288,11 +297,6 @@ export interface DonationAnalytics {
 }
 
 export async function getDonationAnalytics(): Promise<DonationAnalytics[]> {
-    // Supabase doesn't support GROUP BY natively in the JS client.
-    // Use an RPC call or raw query. Here we use a workaround:
-    // fetch all clicks and aggregate in JS, OR use a database function.
-    //
-    // For simplicity, we fetch recent clicks and aggregate in JS.
     const sb = getSupabase();
     const { data, error } = await sb
         .from('donation_clicks')
@@ -329,7 +333,7 @@ export async function getDonationClicksBySlug(slug: string): Promise<DonationCli
 }
 
 // ---------------------------------------------------------------------------
-// Data Expiry — Purge rows older than 7 days
+// Data Expiry — Purge expired cards (7-day retention)
 // ---------------------------------------------------------------------------
 
 export interface PurgeResult {
@@ -339,49 +343,112 @@ export interface PurgeResult {
     donation_clicks_deleted: number;
 }
 
+export interface DeletionAuditRow {
+    id: number;
+    card_id: number;
+    deleted_at: string;
+    reason: string;
+}
+
 export async function purgeExpiredData(): Promise<PurgeResult> {
     const sb = getSupabase();
-    const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const now = new Date().toISOString();
 
-    // Delete in dependency order: children first, then parent
+    // Find expired, not-yet-deleted cards
+    const { data: expiredCards, error: findErr } = await sb
+        .from('cards')
+        .select('id, slug')
+        .lte('expires_at', now)
+        .eq('is_deleted', false);
+    if (findErr) throw new Error(`purgeExpiredData (find expired): ${findErr.message}`);
 
-    // 1. Donation clicks (no FK dependency)
-    const { data: dcData, error: dcErr } = await sb
-        .from('donation_clicks')
-        .delete()
-        .lt('created_at', cutoff)
-        .select('id');
-    if (dcErr) throw new Error(`purgeExpiredData (donation_clicks): ${dcErr.message}`);
+    if (!expiredCards || expiredCards.length === 0) {
+        return { cards_deleted: 0, replies_deleted: 0, payments_deleted: 0, donation_clicks_deleted: 0 };
+    }
 
-    // 2. Replies (FK → cards)
+    const expiredIds = expiredCards.map(c => c.id);
+    const expiredSlugs = expiredCards.filter(c => c.slug).map(c => c.slug);
+
+    // Delete in dependency order: children first
+
+    // 1. Donation clicks (by slug)
+    let dcCount = 0;
+    if (expiredSlugs.length > 0) {
+        const { data: dcData, error: dcErr } = await sb
+            .from('donation_clicks')
+            .delete()
+            .in('card_slug', expiredSlugs)
+            .select('id');
+        if (dcErr) throw new Error(`purgeExpiredData (donation_clicks): ${dcErr.message}`);
+        dcCount = dcData?.length ?? 0;
+    }
+
+    // 2. Replies (by card_id)
     const { data: rData, error: rErr } = await sb
         .from('replies')
         .delete()
-        .lt('created_at', cutoff)
+        .in('card_id', expiredIds)
         .select('id');
     if (rErr) throw new Error(`purgeExpiredData (replies): ${rErr.message}`);
 
-    // 3. Payments (FK → cards)
+    // 3. Payments (by card_id)
     const { data: pData, error: pErr } = await sb
         .from('payments')
         .delete()
-        .lt('created_at', cutoff)
+        .in('card_id', expiredIds)
         .select('id');
     if (pErr) throw new Error(`purgeExpiredData (payments): ${pErr.message}`);
 
-    // 4. Cards (parent table — last)
-    const { data: cData, error: cErr } = await sb
+    // 4. Insert deletion audit entries
+    const auditRows = expiredIds.map(id => ({
+        card_id: id,
+        reason: 'expired',
+    }));
+    await sb.from('deletion_audit').insert(auditRows);
+
+    // 5. Mark cards as deleted (soft-delete)
+    const { error: markErr } = await sb
         .from('cards')
-        .delete()
-        .lt('created_at', cutoff)
-        .select('id');
-    if (cErr) throw new Error(`purgeExpiredData (cards): ${cErr.message}`);
+        .update({ is_deleted: true, status: 'deleted', updated_at: now })
+        .in('id', expiredIds);
+    if (markErr) throw new Error(`purgeExpiredData (mark deleted): ${markErr.message}`);
 
     return {
-        cards_deleted: cData?.length ?? 0,
+        cards_deleted: expiredIds.length,
         replies_deleted: rData?.length ?? 0,
         payments_deleted: pData?.length ?? 0,
-        donation_clicks_deleted: dcData?.length ?? 0,
+        donation_clicks_deleted: dcCount,
     };
 }
 
+// ---------------------------------------------------------------------------
+// Deletion Audit
+// ---------------------------------------------------------------------------
+
+export async function getDeletionAudit(limit = 100): Promise<DeletionAuditRow[]> {
+    const sb = getSupabase();
+    const { data, error } = await sb
+        .from('deletion_audit')
+        .select('*')
+        .order('deleted_at', { ascending: false })
+        .limit(limit);
+    if (error) throw new Error(`getDeletionAudit: ${error.message}`);
+    return data ?? [];
+}
+
+export async function restoreCard(id: number): Promise<void> {
+    const sb = getSupabase();
+    const newExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { error: updateErr } = await sb
+        .from('cards')
+        .update({ is_deleted: false, status: 'active', expires_at: newExpiry, updated_at: new Date().toISOString() })
+        .eq('id', id);
+    if (updateErr) throw new Error(`restoreCard: ${updateErr.message}`);
+
+    // Remove audit entries for this card
+    const { error: deleteErr } = await sb
+        .from('deletion_audit')
+        .delete()
+        .eq('card_id', id);
+    if (deleteErr) throw new Error(`restoreCard (audit): ${deleteErr.message}`);
+}

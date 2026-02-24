@@ -1,51 +1,52 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { purgeExpiredData } from '@/lib/db';
 
 // ---------------------------------------------------------------------------
-// GET /api/cron/cleanup — Purge data older than 7 days
+// GET & POST /api/cron/cleanup
 // ---------------------------------------------------------------------------
-// Runs automatically via Vercel Cron (configured in vercel.json).
-// Vercel sends: Authorization: Bearer <CRON_SECRET>
+// Deletes card data older than 7 days (based on expires_at).
+// Protected by CRON_SECRET via:
+//   - ?token=SECRET query param (manual trigger)
+//   - Authorization: Bearer SECRET header (Vercel Cron / GitHub Actions)
 //
-// To set up:
-//   1. Add CRON_SECRET env var in Vercel Dashboard → Settings → Environment Variables
-//   2. Deploy — the cron runs daily at 3 AM UTC automatically
-//
-// Manual trigger: GET /api/cron/cleanup?token=YOUR_CRON_SECRET
+// Vercel Cron: configured in vercel.json → runs daily at 03:00 UTC
+// GitHub Actions: .github/workflows/cleanup.yml → runs daily
 // ---------------------------------------------------------------------------
 
-export async function GET(request: Request) {
+function isAuthorized(request: NextRequest): boolean {
     const secret = process.env.CRON_SECRET;
+    if (!secret) return false;
 
-    if (!secret) {
-        return NextResponse.json(
-            { error: 'CRON_SECRET not configured. Add it to your Vercel environment variables.' },
-            { status: 500 }
-        );
-    }
+    // Check query parameter
+    const url = new URL(request.url);
+    const token = url.searchParams.get('token');
+    if (token === secret) return true;
 
-    // Check Vercel cron auth header OR manual query param token
+    // Check Authorization header (Vercel Cron uses this)
     const authHeader = request.headers.get('authorization');
-    const { searchParams } = new URL(request.url);
-    const queryToken = searchParams.get('token');
+    if (authHeader === `Bearer ${secret}`) return true;
 
-    const isAuthorized =
-        authHeader === `Bearer ${secret}` || queryToken === secret;
+    return false;
+}
 
-    if (!isAuthorized) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+export async function GET(request: NextRequest) {
+    if (!isAuthorized(request)) {
+        return NextResponse.json(
+            { error: 'Unauthorized — provide ?token= or Authorization: Bearer header' },
+            { status: 401 }
+        );
     }
 
     try {
         const result = await purgeExpiredData();
         return NextResponse.json({
             ok: true,
-            message: 'Cleanup completed — rows older than 7 days deleted',
+            message: 'Cleanup completed — expired cards soft-deleted',
             ...result,
             timestamp: new Date().toISOString(),
         });
     } catch (err) {
-        console.error('Cron cleanup error:', err);
+        console.error('Cleanup error:', err);
         return NextResponse.json(
             { error: 'Cleanup failed', details: String(err) },
             { status: 500 }
@@ -53,3 +54,7 @@ export async function GET(request: Request) {
     }
 }
 
+export async function POST(request: NextRequest) {
+    // POST method for GitHub Actions compatibility
+    return GET(request);
+}

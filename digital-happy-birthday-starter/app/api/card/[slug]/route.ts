@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCardBySlug, getRepliesByCardId } from '@/lib/db';
+import { getCardBySlug } from '@/lib/db';
 
 // ---------------------------------------------------------------------------
 // GET /api/card/[slug]
@@ -30,15 +30,13 @@ export async function GET(
             );
         }
 
-        const replies = await getRepliesByCardId(card.id);
-
         return NextResponse.json({
             slug: card.slug,
             templateId: card.template_id,
             card: JSON.parse(card.card_json),
             status: card.status,
             createdAt: card.created_at,
-            replies,
+            expiresAt: card.expires_at,
         });
     } catch (error) {
         console.error('Get card error:', error);

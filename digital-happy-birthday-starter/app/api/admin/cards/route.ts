@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { listCards, getPaymentAuditLog, getDonationAnalytics } from '@/lib/db';
+import { listCards, getPaymentAuditLog, getDonationAnalytics, getDeletionAudit } from '@/lib/db';
 
 // ---------------------------------------------------------------------------
 // Admin API: GET /api/admin/cards
 // ---------------------------------------------------------------------------
-// Lists recent cards and payment audit log. Protected by ADMIN_TOKEN.
+// Lists recent cards, payment audit log, donation analytics, and deletion audit.
+// Protected by ADMIN_TOKEN.
 // ---------------------------------------------------------------------------
 
 function verifyAdmin(request: NextRequest): boolean {
@@ -33,6 +34,7 @@ export async function GET(request: NextRequest) {
         const cards = await listCards(limit, offset);
         const payments = await getPaymentAuditLog(limit);
         const donationAnalytics = await getDonationAnalytics();
+        const deletionAudit = await getDeletionAudit(limit);
 
         return NextResponse.json({
             cards: cards.map((c) => ({
@@ -41,6 +43,7 @@ export async function GET(request: NextRequest) {
             })),
             payments,
             donationAnalytics,
+            deletionAudit,
             total: cards.length,
         });
     } catch (error) {
