@@ -44,6 +44,8 @@ function initSchema(db: Database.Database) {
       card_json   TEXT NOT NULL,
       template_id TEXT NOT NULL DEFAULT 'pastel-heart',
       status      TEXT NOT NULL DEFAULT 'pending',
+      expires_at  TEXT DEFAULT (datetime('now', '+7 days')),
+      is_deleted  INTEGER NOT NULL DEFAULT 0,
       created_at  TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -61,6 +63,8 @@ function initSchema(db: Database.Database) {
       updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    -- FEATURE_FLAG_REPLIES: Reply table kept for backwards compatibility.
+    -- Reply feature is disabled; table will be dropped in a future migration.
     CREATE TABLE IF NOT EXISTS replies (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       card_id    INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
@@ -80,9 +84,17 @@ function initSchema(db: Database.Database) {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS deletion_audit (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      card_id    INTEGER NOT NULL,
+      deleted_at TEXT NOT NULL DEFAULT (datetime('now')),
+      reason     TEXT NOT NULL DEFAULT 'expired'
+    );
+
     CREATE INDEX IF NOT EXISTS idx_cards_slug ON cards(slug);
     CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(paypal_order_id);
     CREATE INDEX IF NOT EXISTS idx_donation_clicks_slug ON donation_clicks(card_slug);
+    CREATE INDEX IF NOT EXISTS idx_cards_expires ON cards(expires_at);
   `);
 }
 
@@ -95,6 +107,8 @@ export interface CardRow {
     card_json: string;
     template_id: string;
     status: string;
+    expires_at: string | null;
+    is_deleted: boolean;
     created_at: string;
     updated_at: string;
 }
@@ -138,6 +152,20 @@ export interface DonationAnalytics {
     click_count: number;
 }
 
+export interface PurgeResult {
+    cards_deleted: number;
+    replies_deleted: number;
+    payments_deleted: number;
+    donation_clicks_deleted: number;
+}
+
+export interface DeletionAuditRow {
+    id: number;
+    card_id: number;
+    deleted_at: string;
+    reason: string;
+}
+
 // ---------------------------------------------------------------------------
 // Card Helpers
 // ---------------------------------------------------------------------------
@@ -152,7 +180,7 @@ export function createCard(cardJson: string, templateId: string): number {
 
 export function getCardBySlug(slug: string): CardRow | undefined {
     const db = getDb();
-    return db.prepare('SELECT * FROM cards WHERE slug = ? AND status != ?').get(slug, 'deleted') as
+    return db.prepare('SELECT * FROM cards WHERE slug = ? AND status != ? AND is_deleted = 0').get(slug, 'deleted') as
         | CardRow
         | undefined;
 }
@@ -204,7 +232,7 @@ export function flagCard(id: number) {
 
 export function deleteCard(id: number) {
     const db = getDb();
-    db.prepare("UPDATE cards SET status = 'deleted', updated_at = datetime('now') WHERE id = ?").run(id);
+    db.prepare("UPDATE cards SET status = 'deleted', is_deleted = 1, updated_at = datetime('now') WHERE id = ?").run(id);
 }
 
 export function hardDeleteCard(id: number) {
@@ -250,23 +278,26 @@ export function getPaymentAuditLog(limit = 100): PaymentRow[] {
 }
 
 // ---------------------------------------------------------------------------
-// Reply Helpers
+// Reply Helpers — REMOVED (feature disabled)
+// ---------------------------------------------------------------------------
+// FEATURE_FLAG_REPLIES: Reply feature has been removed.
+// To re-enable, uncomment below and restore the reply API route.
 // ---------------------------------------------------------------------------
 
-export function addReply(cardId: number, message: string, sender?: string): number {
-    const db = getDb();
-    const result = db
-        .prepare('INSERT INTO replies (card_id, message, sender) VALUES (?, ?, ?)')
-        .run(cardId, message, sender || 'Anonymous');
-    return result.lastInsertRowid as number;
-}
+// export function addReply(cardId: number, message: string, sender?: string): number {
+//     const db = getDb();
+//     const result = db
+//         .prepare('INSERT INTO replies (card_id, message, sender) VALUES (?, ?, ?)')
+//         .run(cardId, message, sender || 'Anonymous');
+//     return result.lastInsertRowid as number;
+// }
 
-export function getRepliesByCardId(cardId: number): ReplyRow[] {
-    const db = getDb();
-    return db
-        .prepare('SELECT * FROM replies WHERE card_id = ? ORDER BY created_at ASC')
-        .all(cardId) as ReplyRow[];
-}
+// export function getRepliesByCardId(cardId: number): ReplyRow[] {
+//     const db = getDb();
+//     return db
+//         .prepare('SELECT * FROM replies WHERE card_id = ? ORDER BY created_at ASC')
+//         .all(cardId) as ReplyRow[];
+// }
 
 // ---------------------------------------------------------------------------
 // Donation Click Analytics
@@ -303,4 +334,70 @@ export function getDonationClicksBySlug(slug: string): DonationClickRow[] {
     return db
         .prepare('SELECT * FROM donation_clicks WHERE card_slug = ? ORDER BY created_at DESC')
         .all(slug) as DonationClickRow[];
+}
+
+// ---------------------------------------------------------------------------
+// Data Expiry — Purge expired rows
+// ---------------------------------------------------------------------------
+
+export async function purgeExpiredData(): Promise<PurgeResult> {
+    const db = getDb();
+
+    // Delete in dependency order: children first
+    const dcResult = db.prepare(
+        "DELETE FROM donation_clicks WHERE card_slug IN (SELECT slug FROM cards WHERE expires_at <= datetime('now') AND is_deleted = 0)"
+    ).run();
+
+    const rResult = db.prepare(
+        "DELETE FROM replies WHERE card_id IN (SELECT id FROM cards WHERE expires_at <= datetime('now') AND is_deleted = 0)"
+    ).run();
+
+    const pResult = db.prepare(
+        "DELETE FROM payments WHERE card_id IN (SELECT id FROM cards WHERE expires_at <= datetime('now') AND is_deleted = 0)"
+    ).run();
+
+    // Get cards to delete for audit
+    const expiredCards = db.prepare(
+        "SELECT id FROM cards WHERE expires_at <= datetime('now') AND is_deleted = 0"
+    ).all() as { id: number }[];
+
+    // Insert audit rows
+    const insertAudit = db.prepare(
+        "INSERT INTO deletion_audit (card_id, reason) VALUES (?, 'expired')"
+    );
+    for (const card of expiredCards) {
+        insertAudit.run(card.id);
+    }
+
+    // Mark cards as deleted
+    const cResult = db.prepare(
+        "UPDATE cards SET is_deleted = 1, status = 'deleted', updated_at = datetime('now') WHERE expires_at <= datetime('now') AND is_deleted = 0"
+    ).run();
+
+    return {
+        cards_deleted: cResult.changes,
+        replies_deleted: rResult.changes,
+        payments_deleted: pResult.changes,
+        donation_clicks_deleted: dcResult.changes,
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Deletion Audit
+// ---------------------------------------------------------------------------
+
+export function getDeletionAudit(limit = 100): DeletionAuditRow[] {
+    const db = getDb();
+    return db
+        .prepare('SELECT * FROM deletion_audit ORDER BY deleted_at DESC LIMIT ?')
+        .all(limit) as DeletionAuditRow[];
+}
+
+export function restoreCard(id: number): void {
+    const db = getDb();
+    db.prepare(
+        "UPDATE cards SET is_deleted = 0, status = 'active', expires_at = datetime('now', '+7 days'), updated_at = datetime('now') WHERE id = ?"
+    ).run(id);
+    // Remove audit entries for this card
+    db.prepare('DELETE FROM deletion_audit WHERE card_id = ?').run(id);
 }

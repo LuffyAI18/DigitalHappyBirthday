@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getCardBySlug, getRepliesByCardId } from '@/lib/db';
+import { getCardBySlug } from '@/lib/db';
 import { getTemplateById } from '@/designs/templates';
 import CardPageClient from './CardPageClient';
 
@@ -58,14 +58,12 @@ export default async function CardPage({ params }: Props) {
 
     const cardData = JSON.parse(card.card_json);
     const template = getTemplateById(card.template_id);
-    const replies = await getRepliesByCardId(card.id);
 
     return (
         <CardPageClient
             slug={slug}
             cardData={cardData}
             template={template!}
-            replies={replies}
         />
     );
 }

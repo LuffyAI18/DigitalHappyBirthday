@@ -1,9 +1,17 @@
 // ---------------------------------------------------------------------------
-// 4 Polished Template Designs
+// 4 Polished Template Designs + Color Palette Presets
 // ---------------------------------------------------------------------------
 // All fonts are Google Fonts (free). Lottie keywords are for searching
 // free animations on LottieFiles (https://lottiefiles.com/search).
 // ---------------------------------------------------------------------------
+
+export interface ColorPalettePreset {
+    name: string;
+    icing: string;
+    icingGradient?: string; // optional second gradient color
+    accent: string;
+    bg: string;
+}
 
 export interface TemplateDesign {
     id: string;
@@ -28,6 +36,7 @@ export interface TemplateDesign {
     recommendedCakeSVG: string;
     accessibilityContrastNote: string;
     layoutNotes: string;
+    colorPalettePresets: ColorPalettePreset[];
 }
 
 export const templates: TemplateDesign[] = [
@@ -59,7 +68,7 @@ export const templates: TemplateDesign[] = [
         exampleLottieKeywords: {
             candles: ['candle flame', 'birthday candle', 'candle flicker'],
             confetti: ['pastel confetti', 'heart confetti', 'pink confetti'],
-            background: ['heart burst', 'floating hearts', 'sparkle particles'],
+            background: ['heart burst', 'floating hearts', 'sparkle particles', 'cute particles'],
         },
         exampleMusicKeywords: [
             'happy birthday music box',
@@ -70,7 +79,15 @@ export const templates: TemplateDesign[] = [
         accessibilityContrastNote:
             'Primary (#E85D9C) on bg (#FFF7FB) = 4.6:1 contrast ratio. Text (#4A2040) on bg (#FFF7FB) = 12.1:1. Both pass WCAG AA.',
         layoutNotes:
-            'Center-aligned message above a heart-shaped cake SVG. Recipient name in accent font at top. Floating heart Lottie particles in background. CTA button below cake. Reply form in subtle card below.',
+            'Center-aligned message above a heart-shaped cake SVG. Recipient name in accent font at top. Floating heart Lottie particles in background.',
+        colorPalettePresets: [
+            { name: 'Rose', icing: '#FF9CCF', accent: '#E85D9C', bg: '#FFF7FB' },
+            { name: 'Blush', icing: '#FFB6C1', icingGradient: '#FF69B4', accent: '#FF1493', bg: '#FFF0F5' },
+            { name: 'Lavender', icing: '#D8BFD8', icingGradient: '#DDA0DD', accent: '#9B59B6', bg: '#F8F0FF' },
+            { name: 'Peach', icing: '#FFDAB9', accent: '#FF7F50', bg: '#FFF5EE' },
+            { name: 'Coral', icing: '#FF7F7F', icingGradient: '#FF6B6B', accent: '#FF4444', bg: '#FFF0F0' },
+            { name: 'Mint Rose', icing: '#4ECDC4', icingGradient: '#FF9CCF', accent: '#E85D9C', bg: '#F0FFFC' },
+        ],
     },
 
     // =========================================================================
@@ -100,8 +117,8 @@ export const templates: TemplateDesign[] = [
         },
         exampleLottieKeywords: {
             candles: ['neon candle', 'glow candle', 'flame animation'],
-            confetti: ['neon confetti', 'party popper', 'colorful confetti burst'],
-            background: ['neon spark', 'electric glow', 'animated sprinkles'],
+            confetti: ['neon confetti', 'party popper', 'colorful confetti burst', 'sparkles'],
+            background: ['neon spark', 'electric glow', 'animated sprinkles', 'confetti burst'],
         },
         exampleMusicKeywords: [
             'party music loop',
@@ -112,7 +129,15 @@ export const templates: TemplateDesign[] = [
         accessibilityContrastNote:
             'Accent (#00FFAA) on bg (#0A0A1A) = 14.2:1 contrast. Text (#E8E8FF) on bg (#0A0A1A) = 17.4:1. Both exceed WCAG AAA.',
         layoutNotes:
-            'Dark full-bleed background with neon border effects. Cake preview with glow shadows. Message in a glass-morphism container. Neon-colored CTA button with pulse animation. Confetti launches from bottom on "open cake".',
+            'Dark full-bleed background with neon border effects. Cake preview with glow shadows. Message in a glass-morphism container.',
+        colorPalettePresets: [
+            { name: 'Neon Mint', icing: '#00FFAA', accent: '#FF3CAC', bg: '#0A0A1A' },
+            { name: 'Electric', icing: '#00EEFF', icingGradient: '#FF3CAC', accent: '#FFD700', bg: '#0D0D2B' },
+            { name: 'Cyberpunk', icing: '#FF00FF', icingGradient: '#00FFFF', accent: '#FFD700', bg: '#0A001A' },
+            { name: 'Ultraviolet', icing: '#8B5CF6', icingGradient: '#EC4899', accent: '#A855F7', bg: '#0F0A1E' },
+            { name: 'Acid Green', icing: '#39FF14', accent: '#FF6EC7', bg: '#0A0F0A' },
+            { name: 'Hot Pink', icing: '#FF69B4', icingGradient: '#FF1493', accent: '#00FFAA', bg: '#1A0A1A' },
+        ],
     },
 
     // =========================================================================
@@ -142,8 +167,8 @@ export const templates: TemplateDesign[] = [
         },
         exampleLottieKeywords: {
             candles: ['golden candle', 'elegant candle', 'flicker candle'],
-            confetti: ['gold confetti', 'slow confetti', 'elegant celebration'],
-            background: ['gold sparkle', 'shimmer particles', 'glitter animation'],
+            confetti: ['gold confetti', 'slow confetti', 'elegant celebration', 'confetti burst'],
+            background: ['gold sparkle', 'shimmer particles', 'glitter animation', 'sparkles'],
         },
         exampleMusicKeywords: [
             'classical birthday music',
@@ -152,9 +177,17 @@ export const templates: TemplateDesign[] = [
         ],
         recommendedCakeSVG: 'SheetCake',
         accessibilityContrastNote:
-            'Primary (#8B6914) on bg (#FFFCF5) = 5.8:1 contrast. Text (#2C2416) on bg (#FFFCF5) = 14.8:1. Both pass WCAG AA. Accent gold used only for decorative elements.',
+            'Primary (#8B6914) on bg (#FFFCF5) = 5.8:1 contrast. Text (#2C2416) on bg (#FFFCF5) = 14.8:1. Both pass WCAG AA.',
         layoutNotes:
-            'Centered classic layout with gold filigree borders (CSS). Message in elegant card with subtle shadow. Three-tier sheet cake SVG centered below message. Gold sparkle Lottie around the edges. Serif heading, sans-serif body.',
+            'Centered classic layout with gold filigree borders (CSS). Message in elegant card with subtle shadow. Serif heading, sans-serif body.',
+        colorPalettePresets: [
+            { name: 'Classic Gold', icing: '#C9A84C', accent: '#8B6914', bg: '#FFFCF5' },
+            { name: 'Rose Gold', icing: '#B76E79', icingGradient: '#E8C4B8', accent: '#8B4557', bg: '#FFF8F6' },
+            { name: 'Silver', icing: '#C0C0C0', icingGradient: '#E8E8E8', accent: '#808080', bg: '#FAFAFA' },
+            { name: 'Champagne', icing: '#F7E7CE', icingGradient: '#E8D5B7', accent: '#B8860B', bg: '#FFFEF5' },
+            { name: 'Bronze', icing: '#CD7F32', accent: '#8B5E14', bg: '#FFF8EE' },
+            { name: 'Ivory', icing: '#FFFFF0', icingGradient: '#F5F5DC', accent: '#C9A84C', bg: '#FFFFF0' },
+        ],
     },
 
     // =========================================================================
@@ -184,8 +217,8 @@ export const templates: TemplateDesign[] = [
         },
         exampleLottieKeywords: {
             candles: ['cute candle', 'cartoon birthday candle', 'kawaii candle'],
-            confetti: ['confetti pop', 'party celebration', 'colorful balloons'],
-            background: ['cute stars', 'cartoon cake', 'bouncing emoji'],
+            confetti: ['confetti pop', 'party celebration', 'colorful balloons', 'confetti burst'],
+            background: ['cute stars', 'cartoon cake', 'bouncing emoji', 'cute particles'],
         },
         exampleMusicKeywords: [
             'happy birthday song kids',
@@ -196,7 +229,15 @@ export const templates: TemplateDesign[] = [
         accessibilityContrastNote:
             'Primary (#4ECDC4) should be used on dark text backgrounds only. Text (#2D3436) on bg (#FFF9E6) = 13.8:1 contrast. Accent red used for interactive elements on light bg = 4.7:1.',
         layoutNotes:
-            'Fun wavy background with cartoon doodles. Message in speech-bubble styled container. Round cake SVG with colorful layers. Bouncing sticker animations. CTA button is rounded pill shape with bounce-on-hover. Confetti pops from cake on CTA click.',
+            'Fun wavy background with cartoon doodles. Message in speech-bubble styled container. Round cake SVG with colorful layers.',
+        colorPalettePresets: [
+            { name: 'Sunny', icing: '#FF6B6B', accent: '#4ECDC4', bg: '#FFF9E6' },
+            { name: 'Rainbow', icing: '#FF6B6B', icingGradient: '#4ECDC4', accent: '#FFD93D', bg: '#FFF9E6' },
+            { name: 'Bubblegum', icing: '#FF69B4', icingGradient: '#DA70D6', accent: '#FF1493', bg: '#FFF5FA' },
+            { name: 'Ocean', icing: '#00BFFF', icingGradient: '#4ECDC4', accent: '#0077B6', bg: '#F0F8FF' },
+            { name: 'Candy', icing: '#FF69B4', icingGradient: '#FFFF00', accent: '#FF4500', bg: '#FFFACD' },
+            { name: 'Forest', icing: '#2ECC71', icingGradient: '#27AE60', accent: '#16A085', bg: '#F0FFF4' },
+        ],
     },
 ];
 

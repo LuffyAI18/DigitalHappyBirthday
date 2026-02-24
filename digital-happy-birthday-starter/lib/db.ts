@@ -182,26 +182,30 @@ export async function getPaymentAuditLog(limit = 100): Promise<PaymentRow[]> {
 }
 
 // ---------------------------------------------------------------------------
-// Reply Helpers
+// Reply Helpers — REMOVED (feature disabled)
+// ---------------------------------------------------------------------------
+// FEATURE_FLAG_REPLIES: Reply feature has been removed.
+// To re-enable, uncomment below, restore reply API route,
+// and update CardPageClient to accept replies prop.
 // ---------------------------------------------------------------------------
 
-export async function addReply(cardId: number, message: string, sender?: string): Promise<number> {
-  if (USE_SUPABASE) {
-    const m = await getSupabaseDb();
-    return m.addReply(cardId, message, sender);
-  }
-  const m = await getSqlite();
-  return m.addReply(cardId, message, sender);
-}
+// export async function addReply(cardId: number, message: string, sender?: string): Promise<number> {
+//   if (USE_SUPABASE) {
+//     const m = await getSupabaseDb();
+//     return m.addReply(cardId, message, sender);
+//   }
+//   const m = await getSqlite();
+//   return m.addReply(cardId, message, sender);
+// }
 
-export async function getRepliesByCardId(cardId: number): Promise<ReplyRow[]> {
-  if (USE_SUPABASE) {
-    const m = await getSupabaseDb();
-    return m.getRepliesByCardId(cardId);
-  }
-  const m = await getSqlite();
-  return m.getRepliesByCardId(cardId);
-}
+// export async function getRepliesByCardId(cardId: number): Promise<ReplyRow[]> {
+//   if (USE_SUPABASE) {
+//     const m = await getSupabaseDb();
+//     return m.getRepliesByCardId(cardId);
+//   }
+//   const m = await getSqlite();
+//   return m.getRepliesByCardId(cardId);
+// }
 
 // ---------------------------------------------------------------------------
 // Donation Click Analytics
@@ -250,11 +254,35 @@ export async function purgeExpiredData(): Promise<PurgeResult> {
     const m = await getSupabaseDb();
     return m.purgeExpiredData();
   }
-  // SQLite: not implemented for local dev (data is ephemeral anyway)
-  return {
-    cards_deleted: 0,
-    replies_deleted: 0,
-    payments_deleted: 0,
-    donation_clicks_deleted: 0,
-  };
+  const m = await getSqlite();
+  return m.purgeExpiredData();
+}
+
+// ---------------------------------------------------------------------------
+// Deletion Audit
+// ---------------------------------------------------------------------------
+
+export interface DeletionAuditRow {
+  id: number;
+  card_id: number;
+  deleted_at: string;
+  reason: string;
+}
+
+export async function getDeletionAudit(limit = 100): Promise<DeletionAuditRow[]> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.getDeletionAudit(limit);
+  }
+  const m = await getSqlite();
+  return m.getDeletionAudit(limit);
+}
+
+export async function restoreCard(id: number): Promise<void> {
+  if (USE_SUPABASE) {
+    const m = await getSupabaseDb();
+    return m.restoreCard(id);
+  }
+  const m = await getSqlite();
+  m.restoreCard(id);
 }

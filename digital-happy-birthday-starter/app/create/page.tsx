@@ -5,7 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import templates from '@/designs/templates';
+import type { ColorPalettePreset } from '@/designs/templates';
 import CakePreview from '@/components/CakePreview';
+import type { Topping } from '@/components/CakePreview';
+import CandleInput from '@/components/Editor/CandleInput';
 
 // ---------------------------------------------------------------------------
 // Card Editor Page — /create
@@ -15,7 +18,7 @@ import CakePreview from '@/components/CakePreview';
 // donate page at /card/[slug]/donate.
 // ---------------------------------------------------------------------------
 
-type CakeShape = 'round' | 'heart' | 'sheet';
+type CakeShape = 'round' | 'heart' | 'sheet' | 'tiered';
 
 interface CardFormData {
     to: string;
@@ -25,8 +28,10 @@ interface CardFormData {
     cakeOptions: {
         shape: CakeShape;
         icingColor: string;
+        icingGradient: string | null;
         showCandles: boolean;
         candleCount: number;
+        toppings: Topping[];
     };
     addOns: {
         confetti: boolean;
@@ -80,8 +85,10 @@ export default function CreatePage() {
         cakeOptions: {
             shape: 'round',
             icingColor: '#FF9CCF',
+            icingGradient: null,
             showCandles: true,
             candleCount: 5,
+            toppings: [],
         },
         addOns: {
             confetti: true,
@@ -397,7 +404,7 @@ export default function CreatePage() {
                             <div>
                                 <span className="text-xs text-gray-500">Shape</span>
                                 <div className="flex gap-2 mt-1">
-                                    {(['round', 'heart', 'sheet'] as CakeShape[]).map((shape) => (
+                                    {(['round', 'heart', 'sheet', 'tiered'] as CakeShape[]).map((shape) => (
                                         <button
                                             key={shape}
                                             onClick={() => updateCakeOption('shape', shape)}
@@ -408,7 +415,8 @@ export default function CreatePage() {
                                         >
                                             {shape === 'round' && '⭕'}
                                             {shape === 'heart' && '💖'}
-                                            {shape === 'sheet' && '▬'} {shape}
+                                            {shape === 'sheet' && '▬'}
+                                            {shape === 'tiered' && '🎂'} {shape}
                                         </button>
                                     ))}
                                 </div>
@@ -433,6 +441,72 @@ export default function CreatePage() {
                                 </div>
                             </div>
 
+                            {/* Color Palette Presets */}
+                            <div>
+                                <span className="text-xs text-gray-500">Palette Presets</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {selectedTemplate.colorPalettePresets.map((preset: ColorPalettePreset) => (
+                                        <button
+                                            key={preset.name}
+                                            onClick={() => {
+                                                setFormData((prev) => ({
+                                                    ...prev,
+                                                    cakeOptions: {
+                                                        ...prev.cakeOptions,
+                                                        icingColor: preset.icing,
+                                                        icingGradient: preset.icingGradient || null,
+                                                    },
+                                                    colorPalette: preset.name,
+                                                }));
+                                            }}
+                                            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all min-h-[36px] border ${formData.colorPalette === preset.name
+                                                    ? 'border-gray-800 shadow-sm scale-105'
+                                                    : 'border-gray-200 hover:border-gray-400'
+                                                }`}
+                                            style={{
+                                                background: preset.icingGradient
+                                                    ? `linear-gradient(135deg, ${preset.icing}, ${preset.icingGradient})`
+                                                    : preset.icing,
+                                                color: ['#FFFFFF', '#FFFFF0', '#F7E7CE', '#FFE5B4', '#FFDAB9', '#FFB6C1'].includes(preset.icing) ? '#333' : '#fff',
+                                            }}
+                                            title={preset.name}
+                                        >
+                                            {preset.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Toppings */}
+                            <div>
+                                <span className="text-xs text-gray-500">Toppings</span>
+                                <div className="flex flex-wrap gap-2 mt-1">
+                                    {([['sprinkles', '🌈'], ['cherries', '🍒'], ['macarons', '🧁'], ['fruit', '🍓']] as [Topping, string][]).map(([topping, emoji]) => (
+                                        <button
+                                            key={topping}
+                                            onClick={() => {
+                                                setFormData((prev) => {
+                                                    const current = prev.cakeOptions.toppings;
+                                                    const updated = current.includes(topping)
+                                                        ? current.filter((t) => t !== topping)
+                                                        : [...current, topping];
+                                                    return {
+                                                        ...prev,
+                                                        cakeOptions: { ...prev.cakeOptions, toppings: updated },
+                                                    };
+                                                });
+                                            }}
+                                            className={`px-3 py-2 rounded-lg text-sm capitalize transition-all min-h-[44px] ${formData.cakeOptions.toppings.includes(topping)
+                                                    ? 'bg-pastel-400 text-white'
+                                                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                                }`}
+                                        >
+                                            {emoji} {topping}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             {/* Candles */}
                             <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                                 <label className="flex items-center gap-2 cursor-pointer">
@@ -447,26 +521,12 @@ export default function CreatePage() {
                                     <span className="text-sm">Show Candles</span>
                                 </label>
                                 {formData.cakeOptions.showCandles && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-500">Count:</span>
-                                        <input
-                                            type="number"
-                                            inputMode="numeric"
-                                            min={1}
-                                            max={10}
-                                            value={formData.cakeOptions.candleCount}
-                                            onChange={(e) =>
-                                                updateCakeOption(
-                                                    'candleCount',
-                                                    Math.min(10, Math.max(1, parseInt(e.target.value) || 1))
-                                                )
-                                            }
-                                            placeholder="1-10"
-                                            title="Maximum 10 candles"
-                                            className="w-20 px-3 py-2 border rounded-lg text-sm text-center min-h-[44px]"
-                                        />
-                                        <span className="text-xs text-gray-400">Max 10</span>
-                                    </div>
+                                    <CandleInput
+                                        value={formData.cakeOptions.candleCount}
+                                        onChange={(count) => updateCakeOption('candleCount', count)}
+                                        min={1}
+                                        max={50}
+                                    />
                                 )}
                             </div>
                         </div>
@@ -555,8 +615,10 @@ export default function CreatePage() {
                                             <CakePreview
                                                 shape={formData.cakeOptions.shape}
                                                 icingColor={formData.cakeOptions.icingColor}
+                                                icingGradient={formData.cakeOptions.icingGradient || undefined}
                                                 candleCount={formData.cakeOptions.candleCount}
                                                 showCandles={formData.cakeOptions.showCandles}
+                                                toppings={formData.cakeOptions.toppings}
                                                 size="md"
                                             />
                                         </div>
