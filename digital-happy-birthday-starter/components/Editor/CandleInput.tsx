@@ -6,7 +6,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 // CandleInput — Accessible candle count control
 // ---------------------------------------------------------------------------
 // Allows typing on all devices (desktop + mobile numeric keyboard).
-// Provides +/- stepper buttons and clamps to 1..50 on blur.
+// Provides +/- stepper buttons and clamps to 1..10 on blur.
 // Debounces preview updates by 150ms.
 // ---------------------------------------------------------------------------
 
@@ -21,7 +21,7 @@ export default function CandleInput({
     value,
     onChange,
     min = 1,
-    max = 50,
+    max = 10,
 }: CandleInputProps) {
     const [displayValue, setDisplayValue] = useState(String(value));
     const [error, setError] = useState<string | null>(null);
@@ -134,7 +134,7 @@ export default function CandleInput({
                         value={displayValue}
                         onChange={handleInputChange}
                         onBlur={handleBlur}
-                        aria-label="Number of candles (1 to 50)"
+                        aria-label="Number of candles (1 to 10)"
                         className="w-16 px-2 py-2 border rounded-lg text-sm text-center min-h-[44px] appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield]"
                     />
 

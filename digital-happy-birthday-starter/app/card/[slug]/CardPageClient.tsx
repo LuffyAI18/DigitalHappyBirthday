@@ -10,6 +10,172 @@ import type { TemplateDesign } from '@/designs/templates';
 // ---------------------------------------------------------------------------
 // Card Page Client — Interactive animated card experience
 // ---------------------------------------------------------------------------
+// Before opening: shows a decorative gift box
+// After opening: reveals the cake with a spring animation
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// GiftBoxDisplay — Decorative (non-interactive) gift box for pre-open state
+// ---------------------------------------------------------------------------
+function GiftBoxDisplay({ accent }: { accent: string }) {
+    return (
+        <motion.div
+            className="relative inline-block select-none"
+            animate={{ y: [0, -10, 0] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+        >
+            {/* Gift box lid */}
+            <motion.div
+                style={{
+                    width: 210,
+                    height: 36,
+                    backgroundColor: accent,
+                    borderRadius: '12px 12px 0 0',
+                    position: 'relative',
+                    boxShadow: `0 -4px 20px ${accent}30`,
+                    zIndex: 2,
+                }}
+                animate={{
+                    rotateX: [0, -5, 0, -3, 0],
+                    y: [0, -3, 0, -1, 0],
+                }}
+                transition={{
+                    duration: 2.5,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                }}
+            >
+                {/* Lid ribbon */}
+                <div
+                    style={{
+                        position: 'absolute',
+                        left: '50%',
+                        top: 0,
+                        width: 22,
+                        height: '100%',
+                        backgroundColor: '#FFD700',
+                        transform: 'translateX(-50%)',
+                        borderRadius: '8px 8px 0 0',
+                    }}
+                />
+                {/* Bow */}
+                <motion.div
+                    style={{
+                        position: 'absolute',
+                        top: -24,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        fontSize: 40,
+                        filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.15))',
+                    }}
+                    animate={{
+                        scale: [1, 1.18, 1],
+                        rotate: [0, 6, -6, 0],
+                    }}
+                    transition={{
+                        duration: 1.8,
+                        repeat: Infinity,
+                        ease: 'easeInOut',
+                    }}
+                >
+                    🎀
+                </motion.div>
+            </motion.div>
+
+            {/* Gift box body */}
+            <div
+                style={{
+                    width: 200,
+                    height: 160,
+                    backgroundColor: accent,
+                    borderRadius: '0 0 14px 14px',
+                    position: 'relative',
+                    marginLeft: 5,
+                    boxShadow: `0 12px 48px ${accent}40, inset 0 -6px 16px rgba(0,0,0,0.08)`,
+                }}
+            >
+                {/* Vertical ribbon */}
+                <div
+                    style={{
+                        position: 'absolute',
+                        left: '50%',
+                        top: 0,
+                        width: 22,
+                        height: '100%',
+                        backgroundColor: '#FFD700',
+                        transform: 'translateX(-50%)',
+                    }}
+                />
+                {/* Horizontal ribbon */}
+                <div
+                    style={{
+                        position: 'absolute',
+                        top: '45%',
+                        left: 0,
+                        width: '100%',
+                        height: 22,
+                        backgroundColor: '#FFD700',
+                        transform: 'translateY(-50%)',
+                    }}
+                />
+
+                {/* Shimmer/shine effect */}
+                <motion.div
+                    style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        borderRadius: '0 0 14px 14px',
+                        background: 'linear-gradient(135deg, transparent 25%, rgba(255,255,255,0.25) 50%, transparent 75%)',
+                        pointerEvents: 'none',
+                    }}
+                    animate={{ opacity: [0.3, 0.8, 0.3] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                />
+            </div>
+
+            {/* Sparkle particles around the box */}
+            {[
+                { x: -28, y: 25, delay: 0 },
+                { x: 215, y: 40, delay: 0.6 },
+                { x: -22, y: 130, delay: 1.2 },
+                { x: 220, y: 140, delay: 0.3 },
+                { x: 95, y: -30, delay: 0.9 },
+                { x: -18, y: 80, delay: 1.5 },
+                { x: 225, y: 90, delay: 0.15 },
+            ].map((spark, i) => (
+                <motion.span
+                    key={i}
+                    style={{
+                        position: 'absolute',
+                        left: spark.x,
+                        top: spark.y,
+                        fontSize: 18,
+                        pointerEvents: 'none',
+                    }}
+                    animate={{
+                        scale: [0, 1.3, 0],
+                        opacity: [0, 1, 0],
+                        rotate: [0, 180],
+                    }}
+                    transition={{
+                        duration: 1.5,
+                        delay: spark.delay,
+                        repeat: Infinity,
+                        repeatDelay: 1,
+                        ease: 'easeOut',
+                    }}
+                >
+                    ✨
+                </motion.span>
+            ))}
+        </motion.div>
+    );
+}
+
+// ---------------------------------------------------------------------------
 
 interface CardPageClientProps {
     slug: string;
@@ -23,6 +189,7 @@ interface CardPageClientProps {
             icingColor: string;
             showCandles: boolean;
             candleCount: number;
+            toppings?: string[];
         };
         addOns: {
             confetti: boolean;
@@ -68,23 +235,45 @@ export default function CardPageClient({
                     </motion.h1>
                 </div>
 
-                {/* Cake */}
-                <motion.div
-                    className="flex justify-center py-6"
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.4, type: 'spring' }}
-                >
-                    <div className={isOpened ? '' : 'float-animation'}>
-                        <CakePreview
-                            shape={cardData.cakeOptions.shape}
-                            icingColor={cardData.cakeOptions.icingColor}
-                            candleCount={cardData.cakeOptions.candleCount}
-                            showCandles={cardData.cakeOptions.showCandles && !isOpened}
-                            size="lg"
-                        />
-                    </div>
-                </motion.div>
+                {/* Gift Box (before open) → Cake (after open) */}
+                <div className="flex justify-center py-8 min-h-[240px] sm:min-h-[280px]">
+                    <AnimatePresence mode="wait">
+                        {!isOpened ? (
+                            <motion.div
+                                key="gift-box"
+                                className="flex items-center justify-center"
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.3, y: -60, rotate: 15 }}
+                                transition={{ duration: 0.5, type: 'spring' }}
+                            >
+                                <GiftBoxDisplay accent={template.tailwindColors.accent} />
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                key="cake-reveal"
+                                className="flex items-center justify-center"
+                                initial={{ opacity: 0, scale: 0.5, y: 40 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                transition={{
+                                    duration: 0.8,
+                                    type: 'spring',
+                                    damping: 14,
+                                    stiffness: 120,
+                                }}
+                            >
+                                <CakePreview
+                                    shape={cardData.cakeOptions.shape}
+                                    icingColor={cardData.cakeOptions.icingColor}
+                                    candleCount={cardData.cakeOptions.candleCount}
+                                    showCandles={cardData.cakeOptions.showCandles}
+                                    toppings={(cardData.cakeOptions.toppings || []) as any}
+                                    size="lg"
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
 
                 {/* Open CTA or Message */}
                 <div className="px-6 pb-6">
