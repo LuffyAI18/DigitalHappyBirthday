@@ -460,8 +460,8 @@ export default function CreatePage() {
                                                 }));
                                             }}
                                             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all min-h-[36px] border ${formData.colorPalette === preset.name
-                                                    ? 'border-gray-800 shadow-sm scale-105'
-                                                    : 'border-gray-200 hover:border-gray-400'
+                                                ? 'border-gray-800 shadow-sm scale-105'
+                                                : 'border-gray-200 hover:border-gray-400'
                                                 }`}
                                             style={{
                                                 background: preset.icingGradient
@@ -497,8 +497,8 @@ export default function CreatePage() {
                                                 });
                                             }}
                                             className={`px-3 py-2 rounded-lg text-sm capitalize transition-all min-h-[44px] ${formData.cakeOptions.toppings.includes(topping)
-                                                    ? 'bg-pastel-400 text-white'
-                                                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                                                ? 'bg-pastel-400 text-white'
+                                                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
                                                 }`}
                                         >
                                             {emoji} {topping}
@@ -525,7 +525,7 @@ export default function CreatePage() {
                                         value={formData.cakeOptions.candleCount}
                                         onChange={(count) => updateCakeOption('candleCount', count)}
                                         min={1}
-                                        max={50}
+                                        max={10}
                                     />
                                 )}
                             </div>

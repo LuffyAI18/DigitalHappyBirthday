@@ -1,0 +1,2 @@
+﻿.next/dev/types/validator.ts(152,39): error TS2307: Cannot find module '../../../app/api/cards/draft/route.js' or its corresponding type declarations.
+.next/dev/types/validator.ts(206,39): error TS2307: Cannot find module '../../../app/api/shares/track/route.js' or its corresponding type declarations.
