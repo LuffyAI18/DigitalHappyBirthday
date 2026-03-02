@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import GoogleAnalytics from '@/components/GoogleAnalytics';
 import {
   Inter,
   Playfair_Display,
@@ -107,7 +108,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={fontVars}>
-      <body className="font-sans antialiased">{children}</body>
+      <body className="font-sans antialiased">
+        <GoogleAnalytics />
+        {children}
+      </body>
     </html>
   );
 }
