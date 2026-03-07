@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -9,14 +9,143 @@ import type { ColorPalettePreset } from '@/designs/templates';
 import CakePreview from '@/components/CakePreview';
 import type { Topping } from '@/components/CakePreview';
 import CandleInput from '@/components/Editor/CandleInput';
+import { detectCurrencyAsync } from '@/lib/detectCurrency';
+import type { SupportedCurrency } from '@/lib/detectCurrency';
 
 // ---------------------------------------------------------------------------
 // Card Editor Page — /create
 // ---------------------------------------------------------------------------
-// Free card creation — no payment required.
-// On completion, saves card via POST /api/cards and redirects to the
-// donate page at /card/[slug]/donate.
+// Payment-gated card creation (Buy Me a Coffee required).
+// On completion, a payment modal appears (₹19 / $1 / €1 based on region).
+// After the user confirms payment, the card is saved via POST /api/cards
+// and the user is redirected to /card/[slug]/donate.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// PaymentGateModal — shown before card creation to require BMAC payment
+// ---------------------------------------------------------------------------
+const CURRENCY_PRICES: Record<SupportedCurrency, { symbol: string; amount: number; label: string }> = {
+    INR: { symbol: '₹', amount: 19, label: '₹19' },
+    USD: { symbol: '$', amount: 1, label: '$1' },
+    EUR: { symbol: '€', amount: 1, label: '€1' },
+};
+
+interface PaymentGateModalProps {
+    currency: SupportedCurrency;
+    bmacUsername: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+    saving: boolean;
+}
+
+function PaymentGateModal({ currency, bmacUsername, onConfirm, onCancel, saving }: PaymentGateModalProps) {
+    const [hasPaid, setHasPaid] = useState(false);
+    const price = CURRENCY_PRICES[currency];
+    const bmacUrl = `https://www.buymeacoffee.com/${bmacUsername}`;
+
+    const handlePayNow = () => {
+        window.open(bmacUrl, '_blank', 'noopener,noreferrer');
+        // After a short delay, reveal the confirm button
+        setTimeout(() => setHasPaid(true), 2000);
+    };
+
+    return (
+        <AnimatePresence>
+            <motion.div
+                className="fixed inset-0 z-50 flex items-center justify-center p-4"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+            >
+                {/* Backdrop */}
+                <motion.div
+                    className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+                    onClick={onCancel}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                />
+
+                {/* Modal */}
+                <motion.div
+                    className="relative z-10 bg-white rounded-3xl shadow-2xl max-w-sm w-full p-7 text-center"
+                    initial={{ opacity: 0, scale: 0.85, y: 30 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.85, y: 30 }}
+                    transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+                >
+                    {/* Close button */}
+                    <button
+                        onClick={onCancel}
+                        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl leading-none"
+                        aria-label="Close"
+                    >
+                        ✕
+                    </button>
+
+                    {/* Coffee icon */}
+                    <div className="text-5xl mb-3">☕</div>
+
+                    <h2 className="text-xl font-bold mb-2 font-serif text-gray-800">
+                        One small coffee, please!
+                    </h2>
+                    <p className="text-gray-500 text-sm mb-5 leading-relaxed">
+                        Creating a card costs just{' '}
+                        <span className="font-bold text-pink-500 text-base">{price.label}</span>.
+                        Your support keeps this service alive 💖
+                    </p>
+
+                    {/* Step 1 — Pay */}
+                    <motion.button
+                        onClick={handlePayNow}
+                        className="w-full py-3.5 rounded-2xl text-base font-bold text-white shadow-lg mb-3 flex items-center justify-center gap-2"
+                        style={{
+                            background: 'linear-gradient(135deg, #FFDD00, #FFC200)',
+                            color: '#000',
+                        }}
+                        whileHover={{ scale: 1.03, boxShadow: '0 0 24px #FFD70080' }}
+                        whileTap={{ scale: 0.97 }}
+                    >
+                        ☕ Pay {price.label} on Buy Me a Coffee
+                    </motion.button>
+
+                    {/* Step 2 — Confirm (appears after clicking Pay) */}
+                    <AnimatePresence>
+                        {hasPaid && (
+                            <motion.button
+                                initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                                animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
+                                exit={{ opacity: 0, height: 0 }}
+                                onClick={onConfirm}
+                                disabled={saving}
+                                className="w-full py-3.5 rounded-2xl text-base font-bold text-white shadow-lg flex items-center justify-center gap-2 disabled:opacity-60"
+                                style={{ background: 'linear-gradient(135deg, #E85D9C, #c2185b)' }}
+                                whileHover={!saving ? { scale: 1.03 } : {}}
+                                whileTap={!saving ? { scale: 0.97 } : {}}
+                            >
+                                {saving ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                                        </svg>
+                                        Creating your card...
+                                    </>
+                                ) : (
+                                    '✅ I\'ve paid — Create my card! 🎂'
+                                )}
+                            </motion.button>
+                        )}
+                    </AnimatePresence>
+
+                    <p className="text-xs text-gray-400 mt-1">
+                        Clicking "Pay" will open Buy Me a Coffee in a new tab.
+                        Return here and click confirm once done.
+                    </p>
+                </motion.div>
+            </motion.div>
+        </AnimatePresence>
+    );
+}
 
 type CakeShape = 'round' | 'heart' | 'sheet' | 'tiered';
 
@@ -75,7 +204,17 @@ export default function CreatePage() {
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
     const [saving, setSaving] = useState(false);
     const [saveError, setSaveError] = useState<string | null>(null);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [currency, setCurrency] = useState<SupportedCurrency>('INR');
     const editorRef = useRef<HTMLDivElement>(null);
+
+    // Detect user's currency on mount
+    useEffect(() => {
+        detectCurrencyAsync().then(setCurrency);
+    }, []);
+
+    // BMAC username from env (exposed via next.config or hardcoded fallback)
+    const bmacUsername = process.env.NEXT_PUBLIC_BMAC_USERNAME || 'prajwalmd';
 
     const [formData, setFormData] = useState<CardFormData>({
         to: 'Dear ',
@@ -163,11 +302,16 @@ export default function CreatePage() {
         formData.message.trim().length > 0 &&
         formData.from.trim().length > 0;
 
-    const handleComplete = async () => {
+    // Called when user clicks "Complete & Save Card" — shows payment modal
+    const handleComplete = () => {
         if (!isFormValid || saving) return;
-
-        setSaving(true);
         setSaveError(null);
+        setShowPaymentModal(true);
+    };
+
+    // Called after user confirms payment in the modal — actually creates the card
+    const handleConfirmPayment = async () => {
+        setSaving(true);
 
         try {
             const res = await fetch('/api/cards', {
@@ -182,6 +326,7 @@ export default function CreatePage() {
             }
 
             const { slug } = await res.json();
+            setShowPaymentModal(false);
             router.push(`/card/${slug}/donate`);
         } catch (err) {
             setSaveError(
@@ -193,6 +338,18 @@ export default function CreatePage() {
 
     return (
         <div className="min-h-screen">
+            {/* Payment Gate Modal */}
+            {showPaymentModal && (
+                <PaymentGateModal
+                    currency={currency}
+                    bmacUsername={bmacUsername}
+                    onConfirm={handleConfirmPayment}
+                    onCancel={() => {
+                        if (!saving) setShowPaymentModal(false);
+                    }}
+                    saving={saving}
+                />
+            )}
             {/* Top nav */}
             <nav className="fixed top-0 w-full z-50 glass">
                 <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3 flex items-center justify-between">
@@ -690,7 +847,7 @@ export default function CreatePage() {
                                         Your card will get a unique shareable link
                                     </p>
                                 </div>
-                                <div className="text-lg font-bold text-green-500">Free ✨</div>
+                                <div className="text-lg font-bold text-pink-500">☕ Paid</div>
                             </div>
 
                             {saveError && (
@@ -745,7 +902,7 @@ export default function CreatePage() {
                             </motion.button>
 
                             <p className="text-xs text-center text-gray-400">
-                                No payment required • Your card is saved instantly
+                                A small support fee (₹19 / $1 / €1) keeps this service alive ❤️
                             </p>
                         </motion.div>
                     </div>
@@ -768,7 +925,7 @@ export default function CreatePage() {
                     className="w-full py-3.5 rounded-xl text-base font-semibold text-white shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{ background: isFormValid ? '#E85D9C' : '#ccc' }}
                 >
-                    {saving ? 'Saving...' : '🎂 Complete & Save Card — Free'}
+                    {saving ? 'Saving...' : '🎂 Complete & Save Card ☕'}
                 </button>
             </div>
         </div>

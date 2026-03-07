@@ -363,18 +363,6 @@ export default function CardPageClient({
                 </div>
             </motion.div>
 
-            {/* Footer */}
-            <p className="mt-8 text-xs opacity-60">
-                Made By{' '}
-                <a
-                    href="https://www.linkedin.com/in/prajwal-m-d/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline font-medium hover:opacity-80"
-                >
-                    Prajwal M D
-                </a>
-            </p>
         </div>
     );
 }

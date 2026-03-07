@@ -17,18 +17,12 @@ export interface DonationOption {
 export const DONATION_AMOUNTS: Record<SupportedCurrency, DonationOption[]> = {
   INR: [
     { amount: 19, label: 'Donate ₹19' },
-    { amount: 29, label: 'Donate ₹29' },
-    { amount: 49, label: 'Donate ₹49' },
   ],
   USD: [
     { amount: 1, label: 'Donate $1' },
-    { amount: 3, label: 'Donate $3' },
-    { amount: 5, label: 'Donate $5' },
   ],
   EUR: [
     { amount: 1, label: 'Donate €1' },
-    { amount: 3, label: 'Donate €3' },
-    { amount: 5, label: 'Donate €5' },
   ],
 };
 
