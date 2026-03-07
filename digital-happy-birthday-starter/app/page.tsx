@@ -45,8 +45,8 @@ export default function HomePage() {
             </h1>
             <p className="text-lg text-gray-600 mb-8 max-w-lg mx-auto lg:mx-0">
               Create stunning animated birthday cards with beautiful cakes,
-              sparkling confetti, and heartfelt messages —{' '}
-              <span className="font-bold text-green-500">100% free</span>.
+              sparkling confetti, and heartfelt messages — starting at just{' '}
+              <span className="font-bold text-pink-500">₹19 / $1 / €1</span>.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
               <Link href="/create">
@@ -55,7 +55,7 @@ export default function HomePage() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.97 }}
                 >
-                  🎉 Create a Card — Free
+                  🎉 Create a Card — ☕ ₹19/$1/€1
                 </motion.button>
               </Link>
               <Link href="#how-it-works">
@@ -108,7 +108,7 @@ export default function HomePage() {
               {
                 emoji: '✨',
                 title: 'Get Your Link',
-                desc: 'Your card is created instantly with a unique shareable link — completely free!',
+                desc: 'Your card is created instantly with a unique shareable link — from just ₹19.',
               },
               {
                 emoji: '🎁',
@@ -197,7 +197,7 @@ export default function HomePage() {
             Make Someone&apos;s Day Special
           </h2>
           <p className="text-gray-600 mb-8">
-            A personalized, animated birthday card delivered in seconds — for free.
+            A personalized, animated birthday card delivered in seconds — starting at just ₹19.
           </p>
           <Link href="/create">
             <motion.button
