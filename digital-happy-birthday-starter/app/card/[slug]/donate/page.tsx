@@ -27,9 +27,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const cardData = JSON.parse(card.card_json);
 
     return {
-        title: `Support the Developer — Card for ${cardData.to}`,
+        title: `Donate to Developer — Card for ${cardData.to}`,
         description:
-            'Your birthday card is saved! Consider a small donation to support the developer.',
+            'Your birthday card is saved! Donate to developer to get more and more innovation like this.',
     };
 }
 

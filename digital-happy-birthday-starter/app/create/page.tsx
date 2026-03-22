@@ -24,12 +24,6 @@ import type { SupportedCurrency } from '@/lib/detectCurrency';
 // ---------------------------------------------------------------------------
 // PaymentGateModal — shown before card creation to require BMAC payment
 // ---------------------------------------------------------------------------
-const CURRENCY_PRICES: Record<SupportedCurrency, { symbol: string; amount: number; label: string }> = {
-    INR: { symbol: '₹', amount: 19, label: '₹19' },
-    USD: { symbol: '$', amount: 1, label: '$1' },
-    EUR: { symbol: '€', amount: 1, label: '€1' },
-};
-
 interface PaymentGateModalProps {
     currency: SupportedCurrency;
     bmacUsername: string;
@@ -40,7 +34,6 @@ interface PaymentGateModalProps {
 
 function PaymentGateModal({ currency, bmacUsername, onConfirm, onCancel, saving }: PaymentGateModalProps) {
     const [hasPaid, setHasPaid] = useState(false);
-    const price = CURRENCY_PRICES[currency];
     const bmacUrl = `https://www.buymeacoffee.com/${bmacUsername}`;
 
     const handlePayNow = () => {
@@ -86,12 +79,10 @@ function PaymentGateModal({ currency, bmacUsername, onConfirm, onCancel, saving 
                     <div className="text-5xl mb-3">☕</div>
 
                     <h2 className="text-xl font-bold mb-2 font-serif text-gray-800">
-                        One small coffee, please!
+                        Support the Developer!
                     </h2>
                     <p className="text-gray-500 text-sm mb-5 leading-relaxed">
-                        Creating a card costs just{' '}
-                        <span className="font-bold text-pink-500 text-base">{price.label}</span>.
-                        Your support keeps this service alive 💖
+                        Donate to support the developer's efforts and help build more amazing websites like this! 💖
                     </p>
 
                     {/* Step 1 — Pay */}
@@ -105,7 +96,7 @@ function PaymentGateModal({ currency, bmacUsername, onConfirm, onCancel, saving 
                         whileHover={{ scale: 1.03, boxShadow: '0 0 24px #FFD70080' }}
                         whileTap={{ scale: 0.97 }}
                     >
-                        ☕ Pay {price.label} on Buy Me a Coffee
+                        ☕ Support on Buy Me a Coffee
                     </motion.button>
 
                     {/* Step 2 — Confirm (appears after clicking Pay) */}
@@ -131,14 +122,14 @@ function PaymentGateModal({ currency, bmacUsername, onConfirm, onCancel, saving 
                                         Creating your card...
                                     </>
                                 ) : (
-                                    '✅ I\'ve paid — Create my card! 🎂'
+                                    '✅ I\'ve supported — Create my card! 🎂'
                                 )}
                             </motion.button>
                         )}
                     </AnimatePresence>
 
                     <p className="text-xs text-gray-400 mt-1">
-                        Clicking "Pay" will open Buy Me a Coffee in a new tab.
+                        Clicking "Support" will open Buy Me a Coffee in a new tab.
                         Return here and click confirm once done.
                     </p>
                 </motion.div>

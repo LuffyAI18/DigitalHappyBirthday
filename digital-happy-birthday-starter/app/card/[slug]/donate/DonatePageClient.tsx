@@ -84,7 +84,7 @@ export default function DonatePageClient({
 
         // Open Buy Me a Coffee
         const bmacUrl = bmacUsername
-            ? `https://www.buymeacoffee.com/${bmacUsername}?from=${slug}&amount=${amount}`
+            ? `https://www.buymeacoffee.com/${bmacUsername}?from=${slug}`
             : null;
 
         if (bmacUrl) {
@@ -132,10 +132,10 @@ export default function DonatePageClient({
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 }}
                     >
-                        Support the developer — every bit helps
+                        Donate to developer to get more and more innovation like this
                     </motion.h1>
                     <p className="text-gray-500 text-sm">
-                        A small tip keeps this project alive ❤️
+                        Every small contribution helps us build more beautiful experiences for everyone ❤️
                     </p>
                 </div>
 
